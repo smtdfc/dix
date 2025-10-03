@@ -7,9 +7,13 @@ import (
 	"go/format"
 	"go/token"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
 
+// BuildOrder performs a topological sort using Kahn’s algorithm
+// and returns the items in dependency order.
 func BuildOrder(container map[string]*Factory) ([]string, error) {
 	indegree := map[string]int{}
 	graph := map[string][]string{}
@@ -20,6 +24,14 @@ func BuildOrder(container map[string]*Factory) ([]string, error) {
 			indegree[alias] = 0
 		}
 		for _, dep := range f.Deps {
+			if container[dep.Name].Final {
+				return nil, fmt.Errorf("final item %s cannot be a dependency of %s", dep.Name, alias)
+			}
+
+			if container[dep.Name].Disable {
+				return nil, fmt.Errorf("disable item %s cannot be a dependency of %s", dep.Name, alias)
+			}
+
 			graph[dep.Name] = append(graph[dep.Name], alias)
 			indegree[alias]++
 		}
@@ -51,7 +63,17 @@ func BuildOrder(container map[string]*Factory) ([]string, error) {
 		return nil, fmt.Errorf("circular dependency detected")
 	}
 
-	return order, nil
+	normal := []string{}
+	finals := []string{}
+	for _, alias := range order {
+		if container[alias].Final {
+			finals = append(finals, alias)
+		} else {
+			normal = append(normal, alias)
+		}
+	}
+
+	return append(normal, finals...), nil
 }
 
 type GenContext struct {
@@ -60,11 +82,14 @@ type GenContext struct {
 	Counter   int
 }
 
+// GenUID generates a unique variable name.
 func (c *GenContext) GenUID() string {
 	c.Counter++
 	return "id_" + strconv.Itoa(c.Counter)
 }
 
+// ResolveImport ensures the import path has an alias and
+// returns the alias for the given module path.
 func (c *GenContext) ResolveImport(module string) string {
 	if _, ok := c.ImportID[module]; !ok {
 		c.ImportID[module] = c.GenUID()
@@ -72,6 +97,7 @@ func (c *GenContext) ResolveImport(module string) string {
 	return c.ImportID[module]
 }
 
+// generateDepExpr generates an AST expression for a dependency.
 func generateDepExpr(ctx *GenContext, dep *Dependency, config *DIConfig) ast.Expr {
 	if dep.Standalone {
 		// create new instance
@@ -93,7 +119,28 @@ func generateDepExpr(ctx *GenContext, dep *Dependency, config *DIConfig) ast.Exp
 	return ast.NewIdent(ctx.Container[dep.Name])
 }
 
-func GenerateCode(pkg string, config *DIConfig) (string, error) {
+// sanitizeModulePath maps an absolute filesystem path to a proper import path
+// relative to the project root, prefixed with moduleName.
+func sanitizeModulePath(absPath, root, moduleName string) string {
+	absPath = filepath.ToSlash(absPath)
+	root = filepath.ToSlash(root)
+
+	rel, err := filepath.Rel(root, absPath)
+	if err != nil {
+		// fallback: return moduleName only
+		return moduleName
+	}
+	rel = filepath.ToSlash(rel)
+	rel = strings.TrimPrefix(rel, "./")
+	if rel == "." {
+		return moduleName
+	}
+	return moduleName + "/" + rel
+}
+
+// GenerateCode generates Go source code that wires all items
+// in the dependency injection container.
+func GenerateCode(root string, moduleName string, config *DIConfig) (string, error) {
 	ctx := &GenContext{
 		ImportID:  make(map[string]string),
 		Container: make(map[string]string),
@@ -103,6 +150,11 @@ func GenerateCode(pkg string, config *DIConfig) (string, error) {
 	order, err := BuildOrder(config.Container)
 	if err != nil {
 		return "", err
+	}
+
+	// normalize module paths for all factories
+	for _, f := range config.Container {
+		f.Module = sanitizeModulePath(f.Module, root, moduleName)
 	}
 
 	file := &ast.File{
@@ -115,7 +167,7 @@ func GenerateCode(pkg string, config *DIConfig) (string, error) {
 
 	for _, item := range order {
 		factory := config.Container[item]
-		id := ctx.GenUID()
+		id := factory.Alias
 		ctx.Container[item] = id
 
 		args := []ast.Expr{}
@@ -125,7 +177,6 @@ func GenerateCode(pkg string, config *DIConfig) (string, error) {
 
 		modAlias := ctx.ResolveImport(factory.Module)
 
-		// id_x := modAlias.Func(args...)
 		assign := &ast.AssignStmt{
 			Lhs: []ast.Expr{ast.NewIdent(id)},
 			Tok: token.DEFINE,
@@ -140,7 +191,28 @@ func GenerateCode(pkg string, config *DIConfig) (string, error) {
 			},
 		}
 
-		stmts = append(stmts, assign)
+		directive := &ast.CommentGroup{
+			List: []*ast.Comment{
+				{
+					Text: fmt.Sprintf("\n//line %s %s", factory.File, factory.Pos),
+				},
+			},
+		}
+
+		stmt := &ast.DeclStmt{
+			Decl: &ast.GenDecl{
+				Doc: directive,
+				Tok: token.VAR,
+				Specs: []ast.Spec{
+					&ast.ValueSpec{
+						Names:  []*ast.Ident{ast.NewIdent(id)},
+						Values: []ast.Expr{assign.Rhs[0]},
+					},
+				},
+			},
+		}
+
+		stmts = append(stmts, stmt)
 		depIdents = append(depIdents, ast.NewIdent(id))
 	}
 
@@ -167,14 +239,14 @@ func GenerateCode(pkg string, config *DIConfig) (string, error) {
 	}
 	file.Decls = append(file.Decls, rootFn)
 
-	// import
+	// imports
 	if len(ctx.ImportID) > 0 {
 		specs := []ast.Spec{
 			&ast.ImportSpec{
 				Name: ast.NewIdent("dix"),
 				Path: &ast.BasicLit{
 					Kind:  token.STRING,
-					Value: "github.com/smtdfc/dix",
+					Value: strconv.Quote("github.com/smtdfc/dix"),
 				},
 			},
 		}
@@ -183,7 +255,7 @@ func GenerateCode(pkg string, config *DIConfig) (string, error) {
 				Name: ast.NewIdent(alias),
 				Path: &ast.BasicLit{
 					Kind:  token.STRING,
-					Value: `"` + mod + `"`,
+					Value: strconv.Quote(mod),
 				},
 			})
 		}
@@ -198,6 +270,7 @@ func GenerateCode(pkg string, config *DIConfig) (string, error) {
 	return ASTToString(fset, file)
 }
 
+// ASTToString converts an AST tree to its string representation.
 func ASTToString(fset *token.FileSet, file *ast.File) (string, error) {
 	var buf bytes.Buffer
 	err := format.Node(&buf, fset, file)
@@ -207,6 +280,7 @@ func ASTToString(fset *token.FileSet, file *ast.File) (string, error) {
 	return buf.String(), nil
 }
 
+// WriteGoFile converts and writes an AST tree into a Go source file.
 func WriteGoFile(fset *token.FileSet, file *ast.File, outPath string) error {
 	out, err := os.Create(outPath)
 	if err != nil {

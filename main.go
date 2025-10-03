@@ -16,7 +16,8 @@ import (
 
 var annRe = regexp.MustCompile(`^@([A-Za-z0-9_]+):\s*(.+)$`)
 
-func parseFileComments(path string) ([]Annotation, error) {
+// parseFileComments parses the given Go file and extracts all annotations.
+func parseFileComments(root string, path string) ([]Annotation, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
@@ -24,6 +25,11 @@ func parseFileComments(path string) ([]Annotation, error) {
 	}
 
 	dir := filepath.ToSlash(filepath.Dir(path))
+	rel, err := filepath.Rel(root, dir)
+	if err != nil {
+		return nil, err
+	}
+
 	var out []Annotation
 	for _, cg := range f.Comments {
 		for _, c := range cg.List {
@@ -41,9 +47,10 @@ func parseFileComments(path string) ([]Annotation, error) {
 					metadata := &AnnotationMetadata{
 						Key:   m[1],
 						Value: strings.TrimSpace(m[2]),
-						File:  path,
+						File:  pos.Filename,
 						Line:  pos.Line,
-						Path:  dir,
+						Path:  rel,
+						Pos:   fmt.Sprintf("%d:%d", pos.Line, pos.Column),
 					}
 
 					if metadata.Key == "factory" {
@@ -52,6 +59,14 @@ func parseFileComments(path string) ([]Annotation, error) {
 
 					if metadata.Key == "wire" {
 						out = append(out, parseWireAnnotation(metadata))
+					}
+
+					if metadata.Key == "final" {
+						out = append(out, parseFinalAnnotation(metadata))
+					}
+
+					if metadata.Key == "disable" {
+						out = append(out, parseDisableAnnotation(metadata))
 					}
 				}
 			}
@@ -69,6 +84,8 @@ func parseFactoryAnnotation(ann *AnnotationMetadata) *FactoryAnnotation {
 		Path:     ann.Path,
 		Function: funcName,
 		Alias:    alias,
+		File:     ann.File,
+		Pos:      ann.Pos,
 	}
 }
 
@@ -92,6 +109,24 @@ func parseWireAnnotation(ann *AnnotationMetadata) *WireAnnotation {
 	}
 }
 
+func parseFinalAnnotation(ann *AnnotationMetadata) *FinalAnnotation {
+	value := strings.TrimSpace(ann.Value)
+
+	return &FinalAnnotation{
+		Path:   ann.Path,
+		Target: value,
+	}
+}
+
+func parseDisableAnnotation(ann *AnnotationMetadata) *DisableAnnotation {
+	value := strings.TrimSpace(ann.Value)
+
+	return &DisableAnnotation{
+		Path:   ann.Path,
+		Target: value,
+	}
+}
+
 func scanDir(root string) ([]Annotation, error) {
 	var res []Annotation
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -103,7 +138,7 @@ func scanDir(root string) ([]Annotation, error) {
 			return nil
 		}
 		if filepath.Ext(p) == ".go" {
-			anns, err := parseFileComments(p)
+			anns, err := parseFileComments(root, p)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "parse error %s: %v\n", p, err)
 				return nil
@@ -116,6 +151,8 @@ func scanDir(root string) ([]Annotation, error) {
 	return res, err
 }
 
+// ScanProjectAndGenerateDI scans the project for annotations and generates
+// Go source code for the dependency injection system.
 func ScanProjectAndGenerateDI(root string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
@@ -154,12 +191,34 @@ func ScanProjectAndGenerateDI(root string) (string, error) {
 					Function: factory.Function,
 					Deps:     make([]*Dependency, 0),
 					Module:   modName,
+					File:     factory.File,
+					Pos:      factory.Pos,
+					Alias:    factory.Alias,
 				}
 			}
 		}
 	}
 
 	for _, a := range anns {
+
+		if a.Type() == "Final" {
+			finalAnns := a.(*FinalAnnotation)
+			if item, ok := diConfig.Container[finalAnns.Target]; ok {
+				item.Final = true
+			} else {
+				return "", errors.New("Can't resolve dependency " + finalAnns.Target + " in " + diConfig.Container[finalAnns.Target].Module)
+			}
+		}
+
+		if a.Type() == "Disable" {
+			disableAnns := a.(*DisableAnnotation)
+			if item, ok := diConfig.Container[disableAnns.Target]; ok {
+				item.Disable = true
+			} else {
+				return "", errors.New("Can't resolve dependency " + disableAnns.Target + " in " + diConfig.Container[disableAnns.Target].Module)
+			}
+		}
+
 		if a.Type() == "Wire" {
 			wire := a.(*WireAnnotation)
 			if _, ok := diConfig.Container[wire.Target]; ok {
@@ -187,7 +246,15 @@ func ScanProjectAndGenerateDI(root string) (string, error) {
 
 		}
 	}
-	return GenerateCode(f.Module.Mod.Path, diConfig)
+	return GenerateCode(f.Module.Mod.Path, f.Module.Mod.Path, diConfig)
 }
+
+// func Generate(root string) error {
+// 	code, err := ScanProjectAndGenerateDI(root)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 func Mark(values ...any) {}

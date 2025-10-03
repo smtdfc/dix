@@ -6,9 +6,14 @@ type Dependency struct {
 }
 
 type Factory struct {
+	Alias    string
 	Function string
 	Deps     []*Dependency
 	Module   string
+	Final    bool
+	Disable  bool
+	File     string
+	Pos      string
 }
 
 type DIConfig struct {
