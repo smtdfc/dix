@@ -10,8 +10,8 @@ import (
 
 type Parser struct{}
 
-func (p *Parser) ParseConstructorFn(pkg *packages.Package, file *ast.File, fn *ast.FuncDecl) (*Constructor, error) {
-	c := new(Constructor)
+func (p *Parser) ParseComposition(pkg *packages.Package, file *ast.File, fn *ast.FuncDecl) (*Composition, error) {
+	c := new(Composition)
 	fileName := pkg.Fset.Position(file.Package).Filename
 	c.Name = fn.Name.Name
 	c.File = fileName
@@ -31,6 +31,7 @@ func (p *Parser) ParseConstructorFn(pkg *packages.Package, file *ast.File, fn *a
 						Pkg:       pkgPath,
 						IsPointer: isPointer,
 					},
+					IsSingleton: false,
 				})
 
 			}
@@ -65,8 +66,9 @@ func (p *Parser) ParseConstructorFn(pkg *packages.Package, file *ast.File, fn *a
 func (p *Parser) Parse(dir string) (*Metadata, error) {
 
 	cfg := &packages.Config{
-		Dir:  dir,
-		Mode: packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedImports,
+		Dir:        dir,
+		BuildFlags: []string{"-tags=dix"},
+		Mode:       packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedImports,
 	}
 
 	metadata := new(Metadata)
@@ -96,12 +98,17 @@ func (p *Parser) Parse(dir string) (*Metadata, error) {
 				}
 
 				if containsInjectable(fn.Doc.Text()) {
-					m, err := p.ParseConstructorFn(pkg, file, fn)
+					m, err := p.ParseComposition(pkg, file, fn)
 					if err != nil {
 						parseErr = err
 						return false
 					}
-					metadata.Constructors = append(metadata.Constructors, m)
+
+					if containsRoot(fn.Doc.Text()) {
+						metadata.Root = m
+					} else {
+						metadata.Compositions = append(metadata.Compositions, m)
+					}
 				}
 				return true
 			})

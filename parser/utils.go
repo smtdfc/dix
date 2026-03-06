@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"go/types"
+	"regexp"
 )
 
 func getPackagePath(t types.Type) string {
@@ -43,4 +44,10 @@ func parseTypeDetails(t types.Type) (string, bool) {
 func containsInjectable(comment string) bool {
 	return (comment != "" && (fmt.Sprintf("%s", comment) == "@Injectable" ||
 		(len(comment) >= 11 && comment[:11] == "@Injectable")))
+}
+
+var rootRegex = regexp.MustCompile(`(?m)^@Root\s*$`)
+
+func containsRoot(comment string) bool {
+	return rootRegex.MatchString(comment)
 }

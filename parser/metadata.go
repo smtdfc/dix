@@ -1,5 +1,6 @@
 package parser
 
 type Metadata struct {
-	Constructors []*Constructor `json:"constructors"`
+	Compositions []*Composition `json:"compositions"`
+	Root         *Composition   `json:"root"`
 }
