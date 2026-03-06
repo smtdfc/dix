@@ -3,16 +3,18 @@ package parser
 import (
 	"fmt"
 	"go/ast"
-	"path/filepath"
 
+	"github.com/fatih/color"
 	"golang.org/x/tools/go/packages"
 )
 
 type Parser struct{}
 
-func (p *Parser) ParseConstructorFn(pkg *packages.Package, fn *ast.FuncDecl) (*Constructor, error) {
+func (p *Parser) ParseConstructorFn(pkg *packages.Package, file *ast.File, fn *ast.FuncDecl) (*Constructor, error) {
 	c := new(Constructor)
+	fileName := pkg.Fset.Position(file.Package).Filename
 	c.Name = fn.Name.Name
+	c.File = fileName
 
 	if fn.Type.Params != nil {
 		for _, field := range fn.Type.Params.List {
@@ -58,24 +60,16 @@ func (p *Parser) ParseConstructorFn(pkg *packages.Package, fn *ast.FuncDecl) (*C
 	return c, nil
 }
 
-func (p *Parser) Parse(fileName, code string) (*Metadata, error) {
-
-	absPath, err := filepath.Abs(fileName)
-	if err != nil {
-		return nil, err
-	}
+func (p *Parser) Parse(dir string) (*Metadata, error) {
 
 	cfg := &packages.Config{
-
+		Dir:  dir,
 		Mode: packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedImports,
-		Overlay: map[string][]byte{
-			absPath: []byte(code),
-		},
 	}
 
 	metadata := new(Metadata)
 
-	pkgs, err := packages.Load(cfg, absPath)
+	pkgs, err := packages.Load(cfg, "./...")
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +82,11 @@ func (p *Parser) Parse(fileName, code string) (*Metadata, error) {
 		}
 
 		for _, file := range pkg.Syntax {
+
+			fileName := pkg.Fset.Position(file.Package).Filename
+
+			fmt.Printf("\033[32m[Scan]\033[0m File: %s ... ", fileName)
+
 			ast.Inspect(file, func(n ast.Node) bool {
 				fn, ok := n.(*ast.FuncDecl)
 				if !ok || fn.Doc == nil {
@@ -95,7 +94,7 @@ func (p *Parser) Parse(fileName, code string) (*Metadata, error) {
 				}
 
 				if containsInjectable(fn.Doc.Text()) {
-					m, err := p.ParseConstructorFn(pkg, fn)
+					m, err := p.ParseConstructorFn(pkg, file, fn)
 					if err != nil {
 						parseErr = err
 						return false
@@ -107,7 +106,11 @@ func (p *Parser) Parse(fileName, code string) (*Metadata, error) {
 			if parseErr != nil {
 				return nil, parseErr
 			}
+
+			color.New(color.FgGreen).Printf("OK\n")
+
 		}
+
 	}
 
 	return metadata, nil

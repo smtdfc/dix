@@ -1,10 +1,10 @@
 package parser
 
 type Dependency struct {
-	Name string
-	Type *TypeInfo
+	Name string    `json:"name"`
+	Type *TypeInfo `json:"type"`
 }
 
 type ReturnValue struct {
-	Type *TypeInfo
+	Type *TypeInfo `json:"type"`
 }

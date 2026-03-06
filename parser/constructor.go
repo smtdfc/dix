@@ -1,8 +1,8 @@
 package parser
 
 type Constructor struct {
-	File   string
-	Name   string
-	Deps   []*Dependency
-	Return *ReturnValue
+	File   string        `json:"file"`
+	Name   string        `json:"name"`
+	Deps   []*Dependency `json:"deps"`
+	Return *ReturnValue  `json:"return"`
 }
