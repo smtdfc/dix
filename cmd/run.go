@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/smtdfc/dix/generator"
 	"github.com/smtdfc/dix/helpers"
 	"github.com/smtdfc/dix/parser"
 	"github.com/spf13/cobra"
@@ -25,6 +26,7 @@ to quickly create a Cobra application.`,
 			targetDir = args[0]
 		}
 		p := parser.NewParser()
+		g := generator.NewGenerator()
 		mt, err := p.Parse(targetDir)
 		if err != nil {
 			log.Fatal(err)
@@ -33,6 +35,16 @@ to quickly create a Cobra application.`,
 		now := time.Now().Unix()
 		fileName := fmt.Sprintf("scan_%d.dix", now)
 		err = helpers.SaveMetadata(mt, fileName)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		code, err := g.Generate(mt)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = helpers.WriteTextFile(code, "./dix/generated/root.go")
 		if err != nil {
 			log.Fatal(err)
 		}

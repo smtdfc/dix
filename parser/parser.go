@@ -15,6 +15,8 @@ func (p *Parser) ParseConstructorFn(pkg *packages.Package, file *ast.File, fn *a
 	fileName := pkg.Fset.Position(file.Package).Filename
 	c.Name = fn.Name.Name
 	c.File = fileName
+	c.PackagePath = pkg.PkgPath
+	c.PackageName = pkg.Name
 
 	if fn.Type.Params != nil {
 		for _, field := range fn.Type.Params.List {
