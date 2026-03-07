@@ -8,13 +8,19 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "dix",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "A zero-magic, compile-time Dependency Injection generator for Go",
+	Long: `Dix is a powerful code generation tool 
+designed to automate dependency wiring in Go projects.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Guided by the Go philosophy of "Explicit over Implicit," Dix avoids 
+runtime reflection and "magic" behavior. Instead, it analyzes your 
+source code's AST (Abstract Syntax Tree) to build a dependency graph 
+and generates clean, readable Go code to initialize your application.
+
+Key Features:
+- Compile-time safety: Catch missing dependencies before you run.
+- Zero Reflection: No performance overhead at runtime.
+- Transparent: Generated code is standard Go that anyone can read and debug.`,
 }
 
 func Execute() {

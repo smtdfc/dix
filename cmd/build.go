@@ -13,20 +13,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var runCmd = &cobra.Command{
-	Use:   "run [directory]",
-	Short: "Scan source code and generate dependency injection wiring",
-	Long: `The 'run' command performs a full analysis of your Go source code 
-within the specified directory. 
+var buildCmd = &cobra.Command{
+	Use:   "build [target] [directory]",
+	Short: "Generate wiring code and compile the Go binary",
+	Long: `The 'build' command is a shortcut that combines code generation and 
+compilation. 
+
 
 Example:
-  dix run ./internal/app`,
+  dix build main.go ./example
+  dix build app.go .`,
 
 	Run: func(cmd *cobra.Command, args []string) {
+		targetBuildFile := "main.go"
 		targetDir := "."
+
 		if len(args) > 0 {
-			targetDir = args[0]
+			targetBuildFile = args[0]
 		}
+
+		if len(args) > 1 {
+			targetDir = args[1]
+		}
+
 		p := parser.NewParser()
 		g := generator.NewGenerator()
 		mt, err := p.Parse(targetDir)
@@ -51,8 +60,8 @@ Example:
 			log.Fatal(err)
 		}
 
-		fmt.Printf("\033[32m[Run]\033[0m Running ... \n ")
-		command := exec.Command("go", "run", ".")
+		fmt.Println("\033[32m[Build]\033[0m Building ... ")
+		command := exec.Command("go", "build", targetBuildFile)
 
 		command.Stdout = os.Stdout
 		command.Stderr = os.Stderr
@@ -61,10 +70,12 @@ Example:
 			log.Fatalf("Error: %v", err)
 		}
 
+		fmt.Println("\033[32m[Build]\033[0m Build successfully ")
+
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(buildCmd)
 
 }

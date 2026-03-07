@@ -18,7 +18,7 @@ func NewGenerator() *Generator {
 }
 
 func (g *Generator) GenerateDep(dep *parser.Dependency, scope *Scope) (ast.Expr, error) {
-	if dep.IsSingleton {
+	if !dep.IsSingleton {
 		ident, ok := scope.Names[dep.Type.Signature()]
 		if !ok {
 			return nil, fmt.Errorf("Dependency not found: %s", dep.Name)
@@ -147,12 +147,38 @@ func (g *Generator) Generate(metadata *parser.Metadata) (string, error) {
 		if err != nil {
 			return "", err
 		}
+
+		scope.Names[composition.Return.Type.Signature()] = id
 		stmts = append(stmts, stmt)
 	}
 
+	lastComp := sortedCompositions[len(sortedCompositions)-1]
+	signature := lastComp.Return.Type.Signature()
+
+	returnIdent, ok := scope.Names[signature]
+	if !ok {
+
+		panic("Không tìm thấy identifier cho return type ròi!")
+	}
+
+	stmts = append(stmts, &ast.ReturnStmt{
+		Return:  token.NoPos,
+		Results: []ast.Expr{returnIdent},
+	})
+
 	fn := &ast.FuncDecl{
 		Name: ast.NewIdent("Root"),
-		Type: &ast.FuncType{Params: &ast.FieldList{}},
+		Type: &ast.FuncType{
+			Params: &ast.FieldList{},
+
+			Results: &ast.FieldList{
+				List: []*ast.Field{
+					{
+						Type: g.TypeToASTExpr(lastComp.Return.Type, scope),
+					},
+				},
+			},
+		},
 		Body: &ast.BlockStmt{
 			List: stmts,
 		},
@@ -172,4 +198,27 @@ func (g *Generator) Generate(metadata *parser.Metadata) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func (g *Generator) TypeToASTExpr(t *parser.TypeInfo, scope *Scope) ast.Expr {
+	var expr ast.Expr
+
+	if t.Pkg != "" {
+
+		alias := scope.Import(t.Pkg)
+		expr = &ast.SelectorExpr{
+			X:   alias,
+			Sel: ast.NewIdent(t.Name),
+		}
+	} else {
+		expr = ast.NewIdent(t.Name)
+	}
+
+	if t.IsPointer {
+		expr = &ast.StarExpr{
+			X: expr,
+		}
+	}
+
+	return expr
 }
