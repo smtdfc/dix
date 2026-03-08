@@ -165,7 +165,11 @@ func (g *Generator) Generate(metadata *parser.Metadata) (string, error) {
 		}
 	}
 
-	sorted := graph.Sort()
+	sorted, err := graph.Sort()
+	if err != nil {
+		return "", err
+	}
+
 	fset := token.NewFileSet()
 	stmts := []ast.Stmt{}
 

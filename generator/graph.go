@@ -1,6 +1,8 @@
 package generator
 
-import "github.com/smtdfc/dix/parser"
+import (
+	"github.com/smtdfc/dix/parser"
+)
 
 type Node struct {
 	Provider *parser.Provider
@@ -13,28 +15,44 @@ type Graph struct {
 	Root *Node
 }
 
-func (g *Graph) Sort() []*parser.Provider {
+func (g *Graph) Sort() ([]*parser.Provider, error) {
 	var sorted []*parser.Provider
-	visited := make(map[*Node]bool)
+	status := make(map[*Node]int)
 
-	var visit func(n *Node)
-	visit = func(n *Node) {
-		if visited[n] {
-			return
+	var visit func(n *Node) error
+	visit = func(n *Node) error {
+		if status[n] == 1 {
+			return NewGenerateError(
+				ErrorDependencyResolve,
+				"circular dependency detected",
+				n.Provider.Name,
+				"",
+				nil,
+			)
 		}
+		if status[n] == 2 {
+			return nil
+		}
+
+		status[n] = 1
 
 		for _, dep := range n.Deps {
-			visit(dep)
+			if err := visit(dep); err != nil {
+				return err
+			}
 		}
 
-		visited[n] = true
+		status[n] = 2
 		sorted = append(sorted, n.Provider)
+		return nil
 	}
 
-	visit(g.Root)
-	return sorted
-}
+	if err := visit(g.Root); err != nil {
+		return nil, err
+	}
 
+	return sorted, nil
+}
 func BuildGraph(root *parser.Provider, providerMap ProviderMap) (*Graph, error) {
 
 	visited := make(map[string]*Node)

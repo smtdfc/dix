@@ -26,7 +26,6 @@ func (s *Scope) Import(pkg string) *ast.Ident {
 		return ident
 	} else {
 		s.Counter++
-		// Dùng Sprintf để format chuẩn và KHÔNG có dấu xuống dòng
 		s.Imports[pkg] = &ast.Ident{
 			Name: fmt.Sprintf("pkg%d", s.Counter),
 		}

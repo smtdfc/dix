@@ -41,6 +41,14 @@ Trang này tổng hợp các lỗi phổ biến khi dùng Dix và cách xử lý
 - Nguyên nhân: dependency thường chưa được tạo trong scope generate.
 - Cách sửa: kiểm tra graph và type matching giữa provider return/param.
 
+`generator/dependency_resolution: circular dependency detected [provider=<ProviderName>]`
+
+- Nguyên nhân: graph dependency bị vòng (ví dụ `A -> B -> C -> A`) nên không thể sắp xếp thứ tự khởi tạo.
+- Cách sửa:
+  1.  Tách một dependency trong vòng thành abstraction khác.
+  2.  Dời phần phụ thuộc chéo sang method/runtime wiring thay vì constructor injection trực tiếp.
+  3.  Kiểm tra lại type return/param để tránh vô tình tạo vòng qua interface tương đương.
+
 ## Nhóm Build và Run
 
 `Error: exit status 1`
