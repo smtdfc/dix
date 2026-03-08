@@ -170,17 +170,21 @@ func (p *Parser) Parse(dir string) (*Metadata, error) {
 					return true
 				}
 
-				if containsInjectable(fn.Doc.Text()) {
+				if containsInjectableAnnotation(fn.Doc.Text()) {
 					m, err := p.ParseProvider(pkg, file, fn)
 					if err != nil {
 						parseErr = err
 						return false
 					}
 
-					if containsRoot(fn.Doc.Text()) {
+					if containsRootAnnotation(fn.Doc.Text()) {
 						metadata.Root = m
 					} else {
 						metadata.Providers = append(metadata.Providers, m)
+					}
+
+					if containsDisableAnnotation(fn.Doc.Text()) {
+						m.IsDisable = true
 					}
 				}
 				return true

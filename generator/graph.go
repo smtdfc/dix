@@ -75,6 +75,16 @@ func BuildGraph(root *parser.Provider, providerMap ProviderMap) (*Graph, error) 
 			return n, nil
 		}
 
+		if p.IsDisable {
+			return nil, NewGenerateError(
+				ErrorDependencyResolve,
+				"disabled provider cannot be used as dependency or root",
+				p.Name,
+				"",
+				nil,
+			)
+		}
+
 		node := &Node{
 			Provider: p,
 			Deps:     make([]*Node, 0),

@@ -49,6 +49,14 @@ Trang này tổng hợp các lỗi phổ biến khi dùng Dix và cách xử lý
   2.  Dời phần phụ thuộc chéo sang method/runtime wiring thay vì constructor injection trực tiếp.
   3.  Kiểm tra lại type return/param để tránh vô tình tạo vòng qua interface tương đương.
 
+`generator/dependency_resolution: disabled provider cannot be used as dependency or root [provider=<ProviderName>]`
+
+- Nguyên nhân: một provider được đánh dấu `@Disable` nhưng vẫn nằm trong dependency chain từ `@Root`.
+- Cách sửa:
+  1.  Bỏ `@Disable` nếu provider đó vẫn cần dùng.
+  2.  Hoặc thay dependency bằng provider khác còn hoạt động.
+  3.  Nếu provider đã deprecated, tách root/dependency graph để không còn tham chiếu vào provider này.
+
 ## Nhóm Build và Run
 
 `Error: exit status 1`

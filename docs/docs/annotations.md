@@ -4,10 +4,11 @@
 
 Trong Dix, Annotations không phải là tính năng của ngôn ngữ Go mà là các chỉ thị (directives) được đặt trong phần chú thích (Doc Comments). Parser của Dix sẽ quét AST (Abstract Syntax Tree) để trích xuất các chỉ thị này, từ đó xác định cách thức kết nối các thành phần trong dự án.
 
-Hiện tại, Dix hỗ trợ hai annotation chính:
+Hiện tại, Dix hỗ trợ ba annotation chính:
 
 - `@Injectable`: Đăng ký thành phần vào hệ thống DI.
 - `@Root`: Xác định điểm khởi tạo gốc của ứng dụng.
+- `@Disable`: Tạm thời loại provider khỏi đồ thị phụ thuộc.
 
 ## Chi tiết các Annotations
 
@@ -69,6 +70,30 @@ Khi sử dụng Annotations, các hàm Constructor phải tuân thủ nghiêm ng
 1. **Giá trị trả về đơn (Single Return Value):** Mỗi Provider chỉ được phép trả về đúng một giá trị. Nếu hàm của bạn trả về lỗi (error), hãy xử lý hoặc bọc (wrap) lỗi đó trước khi đưa vào luồng khởi tạo của Dix.
 2. **Khớp kiểu dữ liệu (Type Matching):** Kiểu dữ liệu trả về của Provider A phải khớp hoàn toàn với kiểu dữ liệu tham số đầu vào của Provider B (bao gồm cả việc phân biệt giữa con trỏ `*T` và giá trị `T`).
 3. **Tính hiển thị (Visibility):** Các hàm và kiểu dữ liệu nên được Export (viết hoa chữ cái đầu) nếu chúng nằm ở các package khác nhau để đảm bảo mã sinh ra trong thư mục `./dix/generated` có thể truy cập được.
+
+### 3. @Disable
+
+`@Disable` cho phép đánh dấu một provider là "không được phép sử dụng" trong quá trình dựng graph.
+
+#### Mục đích:
+
+Hữu ích khi bạn muốn giữ lại code provider để refactor hoặc thử nghiệm, nhưng không muốn Dix dùng provider đó để wiring.
+
+#### Ví dụ:
+
+```go
+// @Injectable
+// @Disable
+func NewLegacyRepo() *LegacyRepo {
+    return &LegacyRepo{}
+}
+```
+
+#### Hành vi:
+
+- Provider có `@Disable` vẫn được parser nhận diện nếu có `@Injectable`.
+- Nếu provider bị disable xuất hiện trong chain dependency của `@Root`, quá trình generate sẽ dừng và báo lỗi.
+- Nếu provider bị disable không được dùng trong graph hiện tại, Dix sẽ bỏ qua provider đó trong runtime wiring flow.
 
 ## Lỗi thường gặp
 

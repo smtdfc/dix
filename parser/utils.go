@@ -1,10 +1,14 @@
 package parser
 
 import (
-	"fmt"
 	"go/types"
 	"regexp"
 )
+
+var rootRegex = regexp.MustCompile(`(?m)^@Root\s*$`)
+var singletonRegex = regexp.MustCompile(`(?m)^@Singleton\s*$`)
+var disableRegex = regexp.MustCompile(`(?m)^@Disable\s*$`)
+var injectableRegex = regexp.MustCompile(`(?m)^@Injectable\s*$`)
 
 func getPackagePath(t types.Type) string {
 	switch t := t.(type) {
@@ -41,19 +45,18 @@ func parseTypeDetails(t types.Type) (string, bool) {
 	return typeName, isPointer
 }
 
-func containsInjectable(comment string) bool {
-	return (comment != "" && (fmt.Sprintf("%s", comment) == "@Injectable" ||
-		(len(comment) >= 11 && comment[:11] == "@Injectable")))
+func containsInjectableAnnotation(comment string) bool {
+	return injectableRegex.MatchString(comment)
 }
 
-var rootRegex = regexp.MustCompile(`(?m)^@Root\s*$`)
-
-func containsRoot(comment string) bool {
+func containsRootAnnotation(comment string) bool {
 	return rootRegex.MatchString(comment)
 }
 
-var singletonRegex = regexp.MustCompile(`(?m)^@Singleton\s*$`)
-
-func containsSingleton(comment string) bool {
+func containsSingletonAnnotation(comment string) bool {
 	return singletonRegex.MatchString(comment)
+}
+
+func containsDisableAnnotation(comment string) bool {
+	return disableRegex.MatchString(comment)
 }
