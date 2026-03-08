@@ -1,24 +1,20 @@
 package generator
 
-import (
-	"fmt"
-
-	"github.com/smtdfc/dix/parser"
-)
+import "github.com/smtdfc/dix/parser"
 
 type Node struct {
-	Composition *parser.Composition
-	Deps        []*Node
+	Provider *parser.Provider
+	Deps     []*Node
 }
 
-type CompositionMap map[string]*parser.Composition
+type ProviderMap map[string]*parser.Provider
 
 type Graph struct {
 	Root *Node
 }
 
-func (g *Graph) Sort() []*parser.Composition {
-	var sorted []*parser.Composition
+func (g *Graph) Sort() []*parser.Provider {
+	var sorted []*parser.Provider
 	visited := make(map[*Node]bool)
 
 	var visit func(n *Node)
@@ -32,42 +28,64 @@ func (g *Graph) Sort() []*parser.Composition {
 		}
 
 		visited[n] = true
-		sorted = append(sorted, n.Composition)
+		sorted = append(sorted, n.Provider)
 	}
 
 	visit(g.Root)
 	return sorted
 }
 
-func BuildGraph(root *parser.Composition, compositionMap CompositionMap) (*Graph, error) {
+func BuildGraph(root *parser.Provider, providerMap ProviderMap) (*Graph, error) {
 
 	visited := make(map[string]*Node)
 
-	var buildNode func(comp *parser.Composition) (*Node, error)
-	buildNode = func(comp *parser.Composition) (*Node, error) {
-		sig := comp.Return.Type.Signature()
+	var buildNode func(p *parser.Provider) (*Node, error)
+	buildNode = func(p *parser.Provider) (*Node, error) {
+		if p.Return == nil {
+			return nil, NewGenerateError(
+				ErrorValidation,
+				"provider must declare exactly one return value",
+				p.Name,
+				"",
+				nil,
+			)
+		}
+
+		sig := p.Return.Type.Signature()
 
 		if n, ok := visited[sig]; ok {
 			return n, nil
 		}
 
 		node := &Node{
-			Composition: comp,
-			Deps:        make([]*Node, 0),
+			Provider: p,
+			Deps:     make([]*Node, 0),
 		}
 		visited[sig] = node
 
-		for _, dep := range comp.Deps {
+		for _, dep := range p.Deps {
 			depSig := dep.Type.Signature()
 
-			childComp, ok := compositionMap[depSig]
+			childProvider, ok := providerMap[depSig]
 			if !ok {
-				return nil, fmt.Errorf("Provider not found: %s (Required by %s)", depSig, comp.Name)
+				return nil, NewGenerateError(
+					ErrorDependencyResolve,
+					"provider not found for dependency",
+					p.Name,
+					depSig,
+					nil,
+				)
 			}
 
-			childNode, err := buildNode(childComp)
+			childNode, err := buildNode(childProvider)
 			if err != nil {
-				return nil, err
+				return nil, NewGenerateError(
+					ErrorGraphBuild,
+					"failed to build provider graph",
+					p.Name,
+					depSig,
+					err,
+				)
 			}
 			node.Deps = append(node.Deps, childNode)
 		}

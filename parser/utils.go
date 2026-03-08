@@ -51,3 +51,9 @@ var rootRegex = regexp.MustCompile(`(?m)^@Root\s*$`)
 func containsRoot(comment string) bool {
 	return rootRegex.MatchString(comment)
 }
+
+var singletonRegex = regexp.MustCompile(`(?m)^@Singleton\s*$`)
+
+func containsSingleton(comment string) bool {
+	return singletonRegex.MatchString(comment)
+}

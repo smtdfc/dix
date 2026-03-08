@@ -9,5 +9,8 @@ type TypeInfo struct {
 }
 
 func (t *TypeInfo) Signature() string {
+	if t.IsPointer {
+		return fmt.Sprintf("ptr_%s@%s", t.Name, t.Pkg)
+	}
 	return fmt.Sprintf("%s@%s", t.Name, t.Pkg)
 }

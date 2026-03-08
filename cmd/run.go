@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"time"
@@ -31,24 +30,24 @@ Example:
 		g := generator.NewGenerator()
 		mt, err := p.Parse(targetDir)
 		if err != nil {
-			log.Fatal(err)
+			fatalDixError(err)
 		}
 
 		now := time.Now().Unix()
 		fileName := fmt.Sprintf("scan_%d.dix", now)
 		err = helpers.SaveMetadata(mt, fileName)
 		if err != nil {
-			log.Fatal(err)
+			fatalDixError(err)
 		}
 
 		code, err := g.Generate(mt)
 		if err != nil {
-			log.Fatal(err)
+			fatalDixError(err)
 		}
 
 		err = helpers.WriteTextFile(code, "./dix/generated/root.go")
 		if err != nil {
-			log.Fatal(err)
+			fatalDixError(err)
 		}
 
 		fmt.Printf("\033[32m[Run]\033[0m Running ... \n ")
@@ -58,7 +57,7 @@ Example:
 		command.Stderr = os.Stderr
 
 		if err := command.Run(); err != nil {
-			log.Fatalf("Error: %v", err)
+			fatalDixError(err)
 		}
 
 	},

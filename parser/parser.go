@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 
 	"github.com/fatih/color"
 	"golang.org/x/tools/go/packages"
@@ -10,56 +11,128 @@ import (
 
 type Parser struct{}
 
-func (p *Parser) ParseComposition(pkg *packages.Package, file *ast.File, fn *ast.FuncDecl) (*Composition, error) {
-	c := new(Composition)
-	fileName := pkg.Fset.Position(file.Package).Filename
-	c.Name = fn.Name.Name
-	c.File = fileName
-	c.PackagePath = pkg.PkgPath
-	c.PackageName = pkg.Name
+func isDixSingletonNamed(named *types.Named) bool {
+	if named == nil {
+		return false
+	}
+
+	origin := named.Origin()
+	if origin == nil || origin.Obj() == nil || origin.Obj().Pkg() == nil {
+		return false
+	}
+
+	return origin.Obj().Name() == "Singleton" &&
+		origin.Obj().Pkg().Path() == "github.com/smtdfc/dix/di"
+}
+
+func (p *Parser) ParseProvider(pkg *packages.Package, file *ast.File, fn *ast.FuncDecl) (*Provider, error) {
+	c := &Provider{
+		Name:        fn.Name.Name,
+		File:        pkg.Fset.Position(file.Package).Filename,
+		PackagePath: pkg.PkgPath,
+		PackageName: pkg.Name,
+	}
 
 	if fn.Type.Params != nil {
 		for _, field := range fn.Type.Params.List {
+			_, isPointerAtAST := field.Type.(*ast.StarExpr)
+
+			tv := pkg.TypesInfo.TypeOf(field.Type)
+			if tv == nil {
+				continue
+			}
+
 			for _, name := range field.Names {
-				tv := pkg.TypesInfo.TypeOf(field.Type)
-				pkgPath := getPackagePath(tv)
-				typeName, isPointer := parseTypeDetails(tv)
+				var depType *types.Type
+				isSingleton := false
+
+				var singletonNamed *types.Named
+				switch t := tv.(type) {
+				case *types.Named:
+					if isDixSingletonNamed(t) {
+						singletonNamed = t
+					}
+				case *types.Pointer:
+					if n, ok := t.Elem().(*types.Named); ok && isDixSingletonNamed(n) {
+						return nil, NewValidationError(
+							"singleton dependency must be `di.Singleton[T]`, not `*di.Singleton[T]`",
+							fn.Name.Name,
+							name.Name,
+							c.File,
+						)
+					}
+				}
+
+				if singletonNamed != nil {
+					if isPointerAtAST {
+						return nil, NewValidationError(
+							"singleton dependency must be `di.Singleton[T]`, not pointer form",
+							fn.Name.Name,
+							name.Name,
+							c.File,
+						)
+					}
+
+					targs := singletonNamed.TypeArgs()
+					if targs != nil && targs.Len() > 0 {
+						innerType := targs.At(0)
+						depType = &innerType
+						isSingleton = true
+					}
+				}
+
+				if depType == nil {
+					depType = &tv
+				}
+
+				typeName, isPtr := parseTypeDetails(*depType)
+				pkgPath := getPackagePath(*depType)
+
 				c.Deps = append(c.Deps, &Dependency{
 					Name: name.Name,
 					Type: &TypeInfo{
 						Name:      typeName,
 						Pkg:       pkgPath,
-						IsPointer: isPointer,
+						IsPointer: isPtr,
 					},
-					IsSingleton: false,
+					IsSingleton: isSingleton,
 				})
-
 			}
 		}
 	}
 
-	if fn.Type.Results != nil {
+	if fn.Type.Results == nil || len(fn.Type.Results.List) == 0 {
+		return nil, NewValidationError(
+			"provider function must return exactly one value",
+			fn.Name.Name,
+			"",
+			c.File,
+		)
+	}
 
-		if len(fn.Type.Results.List) > 1 {
-			return nil, NewParseError(fmt.Sprintf("Constructor function %s is not return more than one value", fn.Name.Name))
-		}
+	if len(fn.Type.Results.List) > 1 || (len(fn.Type.Results.List) == 1 && len(fn.Type.Results.List[0].Names) > 1) {
+		return nil, NewValidationError(
+			"provider function must return exactly one value",
+			fn.Name.Name,
+			"",
+			c.File,
+		)
+	}
 
-		for _, field := range fn.Type.Results.List {
-			tv := pkg.TypesInfo.TypeOf(field.Type)
+	for _, field := range fn.Type.Results.List {
+		rtv := pkg.TypesInfo.TypeOf(field.Type)
+		rName, rIsPtr := parseTypeDetails(rtv)
+		rPkg := getPackagePath(rtv)
 
-			typeName, isPtr := parseTypeDetails(tv)
-			pkgPath := getPackagePath(tv)
-
-			c.Return = &ReturnValue{
-				Type: &TypeInfo{
-					Name:      typeName,
-					Pkg:       pkgPath,
-					IsPointer: isPtr,
-				},
-			}
-
+		c.Return = &ReturnValue{
+			Type: &TypeInfo{
+				Name:      rName,
+				Pkg:       rPkg,
+				IsPointer: rIsPtr,
+			},
 		}
 	}
+
 	return c, nil
 }
 
@@ -82,7 +155,7 @@ func (p *Parser) Parse(dir string) (*Metadata, error) {
 	for _, pkg := range pkgs {
 
 		if len(pkg.Errors) > 0 {
-			return nil, fmt.Errorf("package load error: %v", pkg.Errors[0])
+			return nil, NewPackageLoadError(pkg.Errors[0])
 		}
 
 		for _, file := range pkg.Syntax {
@@ -98,7 +171,7 @@ func (p *Parser) Parse(dir string) (*Metadata, error) {
 				}
 
 				if containsInjectable(fn.Doc.Text()) {
-					m, err := p.ParseComposition(pkg, file, fn)
+					m, err := p.ParseProvider(pkg, file, fn)
 					if err != nil {
 						parseErr = err
 						return false
@@ -107,12 +180,14 @@ func (p *Parser) Parse(dir string) (*Metadata, error) {
 					if containsRoot(fn.Doc.Text()) {
 						metadata.Root = m
 					} else {
-						metadata.Compositions = append(metadata.Compositions, m)
+						metadata.Providers = append(metadata.Providers, m)
 					}
 				}
 				return true
 			})
 			if parseErr != nil {
+				// Close the in-progress scan line before printing fatal error output.
+				fmt.Println()
 				return nil, parseErr
 			}
 
