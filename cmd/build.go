@@ -54,7 +54,7 @@ Example:
 			fatalDixError(err)
 		}
 
-		err = helpers.WriteTextFile(code, "./dix/generated/root.go")
+		err = helpers.WriteTextFile(code, "./generated/dix/root.go")
 		if err != nil {
 			fatalDixError(err)
 		}
