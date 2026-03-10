@@ -24,6 +24,11 @@ Example:
   dix build app.go .`,
 
 	Run: func(cmd *cobra.Command, args []string) {
+		config, err := helpers.ReadConfig()
+		if err != nil {
+			fatalDixError(err)
+		}
+
 		targetBuildFile := "main.go"
 		targetDir := "."
 
@@ -54,7 +59,11 @@ Example:
 			fatalDixError(err)
 		}
 
-		err = helpers.WriteTextFile(code, "./generated/dix/root.go")
+		outputPath := "./generated/dix/root.go"
+		if config.Output != "" {
+			outputPath = config.Output
+		}
+		err = helpers.WriteTextFile(code, outputPath)
 		if err != nil {
 			fatalDixError(err)
 		}

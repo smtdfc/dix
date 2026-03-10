@@ -100,7 +100,7 @@ func BuildGraph(root *parser.Provider, providerMap ProviderMap) (*Graph, error) 
 					ErrorDependencyResolve,
 					"provider not found for dependency",
 					p.Name,
-					depSig,
+					dep.String(),
 					nil,
 				)
 			}
@@ -111,7 +111,7 @@ func BuildGraph(root *parser.Provider, providerMap ProviderMap) (*Graph, error) 
 					ErrorGraphBuild,
 					"failed to build provider graph",
 					p.Name,
-					depSig,
+					dep.Name,
 					err,
 				)
 			}

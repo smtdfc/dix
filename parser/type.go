@@ -14,3 +14,10 @@ func (t *TypeInfo) Signature() string {
 	}
 	return fmt.Sprintf("%s@%s", t.Name, t.Pkg)
 }
+
+func (t *TypeInfo) String() string {
+	if t.IsPointer {
+		return fmt.Sprintf("type of *%s in package %s", t.Name, t.Pkg)
+	}
+	return fmt.Sprintf("type of %s in package %s", t.Name, t.Pkg)
+}
