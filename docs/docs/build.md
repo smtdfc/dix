@@ -93,16 +93,4 @@ Cả hai lệnh đều sinh:
 
 - `dix/generated/root.go`: mã wiring do Dix generate.
 
-File generated này được thêm build tag ở đầu file:
-
-```go
-//go:build !dix
-// +build !dix
-```
-
-Ý nghĩa:
-
-- Khi Dix scan với `-tags=dix`, file generated sẽ bị bỏ qua để tránh tự quét lại và gây nhiễu lỗi.
-- Khi chạy/built ứng dụng bình thường (không bật tag `dix`), file generated vẫn được sử dụng như bình thường.
-
 Ngoài ra Dix cũng lưu metadata scan với tên dạng `scan_<timestamp>.dix` để phục vụ việc theo dõi kết quả phân tích.

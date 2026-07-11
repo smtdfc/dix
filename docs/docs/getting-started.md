@@ -95,12 +95,14 @@ func NewMessage(service *Service) string {
 Sử dụng mã nguồn do Dix sinh ra để khởi tạo ứng dụng trong `main.go`:
 
 ```go
+//go:build !dix
+// +build !dix
+
 package main
 
 import (
     "fmt"
-    "github.com/your-org/your-app/internal/app"
-    "github.com/your-org/your-app/dix/generated"
+    "github.com/your-org/your-app/.dix/generated"
 )
 
 func main() {
