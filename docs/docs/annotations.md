@@ -67,7 +67,7 @@ func NewApp(svc *Service) *App {
 
 Khi sử dụng Annotations, các hàm Constructor phải tuân thủ nghiêm ngặt các ràng buộc về mặt kỹ thuật để Dix có thể sinh mã chính xác:
 
-1. **Giá trị trả về đơn (Single Return Value):** Mỗi Provider chỉ được phép trả về đúng một giá trị. Nếu hàm của bạn trả về lỗi (error), hãy xử lý hoặc bọc (wrap) lỗi đó trước khi đưa vào luồng khởi tạo của Dix.
+1. **Giá trị trả về kép (Multiple Return Values)**: Mỗi Provider có thể trả về một giá trị kết quả và một error ((T, error)). Nếu có lỗi xảy ra trong quá trình khởi tạo, error đó sẽ được tự động bắt và trả về trực tiếp từ hàm Root đã generate.
 2. **Khớp kiểu dữ liệu (Type Matching):** Kiểu dữ liệu trả về của Provider A phải khớp hoàn toàn với kiểu dữ liệu tham số đầu vào của Provider B (bao gồm cả việc phân biệt giữa con trỏ `*T` và giá trị `T`).
 3. **Tính hiển thị (Visibility):** Các hàm và kiểu dữ liệu nên được Export (viết hoa chữ cái đầu) nếu chúng nằm ở các package khác nhau để đảm bảo mã sinh ra trong thư mục `./dix/generated` có thể truy cập được.
 
