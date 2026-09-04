@@ -15,12 +15,12 @@ import (
 var runCmd = &cobra.Command{
 	Use:   "run [directory]",
 	Short: "Scan source code and generate dependency injection wiring",
-	Long: `The 'run' command performs a full analysis of your Go source code 
-within the specified directory. 
+	Long: `The 'run' command performs a full analysis of your Go source code
+within the specified directory.
 
 Example:
   dix run ./internal/app`,
-
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := helpers.ReadConfig()
 		if err != nil {
@@ -28,12 +28,18 @@ Example:
 		}
 
 		targetDir := "."
+		var goRunArgs []string
+
 		if len(args) > 0 {
 			targetDir = args[0]
+			if len(args) > 1 {
+				goRunArgs = args[1:]
+			}
 		}
+
 		p := parser.NewParser()
 		g := generator.NewGenerator()
-		mt, err := p.Parse(targetDir)
+		mt, err := p.ParseWithOptions(targetDir, parser.ScanOptions{Workspace: runWorkspace, NoCache: runNoCache})
 		if err != nil {
 			fatalDixError(err)
 		}
@@ -58,20 +64,27 @@ Example:
 			fatalDixError(err)
 		}
 
-		fmt.Printf("\033[32m[Run]\033[0m Running ... \n ")
-		command := exec.Command("go", "run", ".")
+		fmt.Printf("\033[32m[Run]\033[0m Running ... \n")
 
+		cmdArgs := []string{"run", "."}
+		cmdArgs = append(cmdArgs, goRunArgs...)
+
+		command := exec.Command("go", cmdArgs...)
 		command.Stdout = os.Stdout
 		command.Stderr = os.Stderr
 
 		if err := command.Run(); err != nil {
 			fatalDixError(err)
 		}
-
 	},
 }
 
+var runWorkspace bool
+var runNoCache bool
+
 func init() {
+	runCmd.Flags().BoolVar(&runWorkspace, "workspace", false, "scan every module declared in the nearest go.work file")
+	runCmd.Flags().BoolVar(&runNoCache, "no-cache", false, "ignore and do not write the scan cache")
 	rootCmd.AddCommand(runCmd)
 
 }

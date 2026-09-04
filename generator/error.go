@@ -29,11 +29,10 @@ func (e *GenerateError) Error() string {
 	}
 
 	msg := fmt.Sprintf("generator/%s: %s%s", e.Kind, e.Message, context)
-	if e.Cause != nil {
-		return fmt.Sprintf("%s: %v", msg, e.Cause)
-	}
 	return msg
 }
+
+func (e *GenerateError) Unwrap() error { return e.Cause }
 
 func NewGenerateError(kind ErrorKind, msg, provider, dependsOn string, cause error) *GenerateError {
 	return &GenerateError{

@@ -42,7 +42,7 @@ Example:
 
 		p := parser.NewParser()
 		g := generator.NewGenerator()
-		mt, err := p.Parse(targetDir)
+		mt, err := p.ParseWithOptions(targetDir, parser.ScanOptions{Workspace: buildWorkspace, NoCache: buildNoCache})
 		if err != nil {
 			fatalDixError(err)
 		}
@@ -83,7 +83,12 @@ Example:
 	},
 }
 
+var buildWorkspace bool
+var buildNoCache bool
+
 func init() {
+	buildCmd.Flags().BoolVar(&buildWorkspace, "workspace", false, "scan every module declared in the nearest go.work file")
+	buildCmd.Flags().BoolVar(&buildNoCache, "no-cache", false, "ignore and do not write the scan cache")
 	rootCmd.AddCommand(buildCmd)
 
 }

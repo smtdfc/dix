@@ -11,7 +11,7 @@ import (
 )
 
 var wireCmd = &cobra.Command{
-	Use:   "wire [target] [directory]",
+	Use:   "wire [directory]",
 	Short: "Generate wiring code",
 	Long:  ``,
 
@@ -23,13 +23,13 @@ var wireCmd = &cobra.Command{
 
 		targetDir := "."
 
-		if len(args) > 1 {
+		if len(args) > 0 {
 			targetDir = args[0]
 		}
 
 		p := parser.NewParser()
 		g := generator.NewGenerator()
-		mt, err := p.Parse(targetDir)
+		mt, err := p.ParseWithOptions(targetDir, parser.ScanOptions{Workspace: wireWorkspace, NoCache: wireNoCache})
 		if err != nil {
 			fatalDixError(err)
 		}
@@ -58,7 +58,12 @@ var wireCmd = &cobra.Command{
 	},
 }
 
+var wireWorkspace bool
+var wireNoCache bool
+
 func init() {
+	wireCmd.Flags().BoolVar(&wireWorkspace, "workspace", false, "scan every module declared in the nearest go.work file")
+	wireCmd.Flags().BoolVar(&wireNoCache, "no-cache", false, "ignore and do not write the scan cache")
 	rootCmd.AddCommand(wireCmd)
 
 }

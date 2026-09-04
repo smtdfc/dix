@@ -7,6 +7,7 @@ type ParseErrorKind string
 const (
 	ParseErrorValidation  ParseErrorKind = "validation"
 	ParseErrorPackageLoad ParseErrorKind = "package_load"
+	ParseErrorWorkspace   ParseErrorKind = "workspace"
 )
 
 type ParseError struct {
@@ -32,13 +33,11 @@ func (e *ParseError) Error() string {
 		context += fmt.Sprintf(" [field=%s]", e.Field)
 	}
 
-	msg := fmt.Sprintf("parser/%s: %s%s%s", e.Kind, e.Message, context, location)
-	if e.Cause != nil {
-		return fmt.Sprintf("%s: %v", msg, e.Cause)
-	}
-
+	msg := fmt.Sprintf("%s%s%s", e.Message, context, location)
 	return msg
 }
+
+func (e *ParseError) Unwrap() error { return e.Cause }
 
 func NewParseError(kind ParseErrorKind, msg string) *ParseError {
 	return &ParseError{

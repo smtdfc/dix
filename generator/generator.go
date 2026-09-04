@@ -71,13 +71,30 @@ func (g *Generator) GenerateDepWithMap(dep *parser.Dependency, scope *Scope, pro
 		}
 
 		diPkg := scope.Import("github.com/smtdfc/dix/di")
-		return &ast.CallExpr{
+		newSingleton := &ast.CallExpr{
 			Fun: &ast.SelectorExpr{
 				X:   diPkg,
 				Sel: ast.NewIdent("NewSingleton"),
 			},
 			Args: []ast.Expr{providerCall},
-		}, nil
+		}
+		if !provider.ReturnsError {
+			return newSingleton, nil
+		}
+
+		value := scope.UniqueIdent(provider.Return.Type.Name)
+		errIdent := ast.NewIdent("err")
+		return &ast.CallExpr{Fun: &ast.FuncLit{
+			Type: &ast.FuncType{Results: &ast.FieldList{List: []*ast.Field{{Type: &ast.IndexExpr{
+				X:     &ast.SelectorExpr{X: diPkg, Sel: ast.NewIdent("Singleton")},
+				Index: g.TypeToASTExpr(provider.Return.Type, scope),
+			}}}}},
+			Body: &ast.BlockStmt{List: []ast.Stmt{
+				&ast.AssignStmt{Lhs: []ast.Expr{value, errIdent}, Tok: token.DEFINE, Rhs: []ast.Expr{providerCall}},
+				returnIfError(errIdent),
+				&ast.ReturnStmt{Results: []ast.Expr{&ast.CallExpr{Fun: &ast.SelectorExpr{X: diPkg, Sel: ast.NewIdent("NewSingleton")}, Args: []ast.Expr{value}}}},
+			}},
+		}}, nil
 	}
 
 	ident, ok := scope.Names[dep.Type.Signature()]
@@ -119,19 +136,39 @@ func (g *Generator) GenerateCallProviderWithMap(provider *parser.Provider, scope
 	}, nil
 }
 
-func (g *Generator) GenerateCreateObjectStmt(ident *ast.Ident, provider *parser.Provider, scope *Scope, providerMap map[string]*parser.Provider) (ast.Stmt, error) {
+func (g *Generator) GenerateCreateObjectStmts(ident *ast.Ident, provider *parser.Provider, scope *Scope, providerMap map[string]*parser.Provider) ([]ast.Stmt, error) {
 	callExpr, err := g.GenerateCallProviderWithMap(provider, scope, providerMap)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ast.AssignStmt{
+	assign := &ast.AssignStmt{
 		Lhs: []ast.Expr{ident},
 		Tok: token.DEFINE,
 		Rhs: []ast.Expr{callExpr},
-	}, nil
+	}
+	if !provider.ReturnsError {
+		return []ast.Stmt{assign}, nil
+	}
+	errIdent := ast.NewIdent("err")
+	assign.Lhs = append(assign.Lhs, errIdent)
+	return []ast.Stmt{assign, returnIfError(errIdent)}, nil
 }
-
+func returnIfError(errIdent *ast.Ident) ast.Stmt {
+	return &ast.IfStmt{
+		Cond: &ast.BinaryExpr{X: errIdent, Op: token.NEQ, Y: ast.NewIdent("nil")},
+		Body: &ast.BlockStmt{
+			List: []ast.Stmt{
+				&ast.ReturnStmt{
+					Results: []ast.Expr{
+						ast.NewIdent("nil"),
+						errIdent,
+					},
+				},
+			},
+		},
+	}
+}
 func (g *Generator) Generate(metadata *parser.Metadata) (string, error) {
 	if metadata.Root == nil {
 		return "", NewGenerateError(ErrorValidation, "cannot find @Root provider", "", "", nil)
@@ -180,13 +217,13 @@ func (g *Generator) Generate(metadata *parser.Metadata) (string, error) {
 		}
 
 		id := scope.UniqueIdent(provider.Return.Type.Name)
-		stmt, err := g.GenerateCreateObjectStmt(id, provider, scope, providerMap)
+		providerStmts, err := g.GenerateCreateObjectStmts(id, provider, scope, providerMap)
 		if err != nil {
 			return "", err
 		}
 
 		scope.Names[provider.Return.Type.Signature()] = id
-		stmts = append(stmts, stmt)
+		stmts = append(stmts, providerStmts...)
 	}
 
 	lastComp := sorted[len(sorted)-1]
@@ -198,7 +235,7 @@ func (g *Generator) Generate(metadata *parser.Metadata) (string, error) {
 	var finalExpr ast.Expr = finalID
 
 	stmts = append(stmts, &ast.ReturnStmt{
-		Results: []ast.Expr{finalExpr},
+		Results: []ast.Expr{finalExpr, ast.NewIdent("nil")},
 	})
 
 	fn := &ast.FuncDecl{
@@ -208,6 +245,9 @@ func (g *Generator) Generate(metadata *parser.Metadata) (string, error) {
 			Results: &ast.FieldList{
 				List: []*ast.Field{
 					{Type: g.TypeToASTExpr(lastComp.Return.Type, scope)},
+					{
+						Type: ast.NewIdent("error"),
+					},
 				},
 			},
 		},

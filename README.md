@@ -99,6 +99,7 @@ Examples:
 ```bash
 dix run .
 dix run ./internal/app
+dix run --workspace .
 ```
 
 ### `dix build [target] [directory]`
@@ -113,6 +114,23 @@ Examples:
 dix build
 dix build main.go .
 dix build cmd/api/main.go ./internal
+dix build --workspace main.go ./apps/api
+```
+
+### Scan a Go workspace
+
+Pass `--workspace` to scan every module listed in the nearest `go.work` file. Dix loads each module with the `dix` build tag, then builds one dependency graph across all scanned providers.
+
+```bash
+dix wire --workspace ./apps/api
+```
+
+The workspace must contain exactly one `@Root` provider, and a type may have only one provider across all scanned modules.
+
+Dix caches successful scan metadata under `.dix/cache`. The cache is invalidated when source files, module files, `go.work`, Go version, or scan mode changes. Use `--no-cache` to force a fresh scan, or clear all entries with:
+
+```bash
+dix cache clean .
 ```
 
 ## Annotations
@@ -131,6 +149,7 @@ Important rules:
 - A graph should have one root.
 - A provider should return exactly one value.
 - Dependency types must match exactly (`T` is different from `*T`).
+- Providers may return either `T` or `(T, error)`. For the latter, generated wiring panics when the error is non-nil.
 
 ## Generated Artifacts
 
