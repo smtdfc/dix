@@ -64,6 +64,23 @@ Trang này tổng hợp các lỗi phổ biến khi dùng Dix và cách xử lý
 - Nguyên nhân: bước `go run` hoặc `go build` của project thất bại sau khi đã generate.
 - Cách sửa: đọc log compiler/runtime ngay phía trên để xử lý lỗi ứng dụng.
 
+## Nhóm Go Workspace
+
+`parser/workspace: no go.work found from <dir>`
+
+- Nguyên nhân: dùng cờ `--workspace` nhưng Dix không tìm thấy tệp `go.work` ở thư mục quét hoặc các thư mục cha.
+- Cách sửa: đảm bảo đã khởi tạo `go.work` ở thư mục gốc của monorepo (`go work init ...`) hoặc chỉ định đúng đường dẫn thư mục.
+
+`parser/workspace: workspace module <moduleDir> does not contain go.mod`
+
+- Nguyên nhân: một đường dẫn module được khai báo trong `use (...)` của `go.work` không chứa file `go.mod`.
+- Cách sửa: kiểm tra lại các đường dẫn khai báo trong `go.work` hoặc bổ sung file `go.mod` cho module đó.
+
+`parser/workspace: workspace file <workFile> does not declare any modules`
+
+- Nguyên nhân: tệp `go.work` không khai báo bất kỳ module nào trong khối `use`.
+- Cách sửa: thêm các module cần thiết vào `go.work` (ví dụ `go work use ./apps/api`).
+
 ## Gợi ý debug nhanh
 
 1. Chạy `dix run .` để xem lỗi parser/generate trước.
