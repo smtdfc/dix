@@ -10,7 +10,8 @@ import (
 const configFileName = "dix.config.json"
 
 type Config struct {
-	Output string `json:"output"`
+	IgnorePackages []string `json:"ignore_packages"`
+	Output         string   `json:"output"`
 }
 
 func ReadConfig() (*Config, error) {

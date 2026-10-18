@@ -5,7 +5,9 @@ import (
 	"go/ast"
 	"go/types"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/fatih/color"
 	"golang.org/x/mod/modfile"
@@ -15,8 +17,9 @@ import (
 type Parser struct{}
 
 type ScanOptions struct {
-	Workspace bool
-	NoCache   bool
+	IgnorePackages []string
+	Workspace      bool
+	NoCache        bool
 }
 
 func isDixSingletonNamed(named *types.Named) bool {
@@ -191,7 +194,7 @@ func (p *Parser) ParseWithOptions(dir string, options ScanOptions) (*Metadata, e
 	}
 	providers := make(map[string]*Provider)
 	for _, moduleDir := range dirs {
-		if err := p.parseModule(moduleDir, metadata, providers); err != nil {
+		if err := p.parseModule(moduleDir, metadata, providers, options.IgnorePackages); err != nil {
 			return nil, err
 		}
 	}
@@ -219,7 +222,7 @@ func findModuleRoot(dir string) (string, error) {
 	}
 }
 
-func (p *Parser) parseModule(dir string, metadata *Metadata, providers map[string]*Provider) error {
+func (p *Parser) parseModule(dir string, metadata *Metadata, providers map[string]*Provider, ignorePkgs []string) error {
 
 	cfg := &packages.Config{
 		Dir:        dir,
@@ -238,7 +241,10 @@ func (p *Parser) parseModule(dir string, metadata *Metadata, providers map[strin
 
 	var parseErr error
 	for _, pkg := range pkgs {
-
+		if shouldIgnorePkg(pkg.ID, ignorePkgs) {
+			fmt.Printf("\033[32m[Ignore]\033[0m Package: %s \n", pkg.ID)
+			continue
+		}
 		if len(pkg.Errors) > 0 {
 			return NewPackageLoadError(pkg.Errors[0])
 		}
@@ -343,6 +349,7 @@ func workspaceModuleDirs(dir string) ([]string, error) {
 				Cause:   err,
 			}
 		}
+
 		moduleDirs = append(moduleDirs, moduleDir)
 	}
 	if len(moduleDirs) == 0 {
@@ -368,6 +375,38 @@ func findGoWork(dir string) (string, error) {
 		absDir = parent
 	}
 }
+
+func shouldIgnorePkg(pkgID string, ignorePatterns []string) bool {
+	for _, pattern := range ignorePatterns {
+		if strings.HasSuffix(pattern, "/*") {
+			prefix := strings.TrimSuffix(pattern, "/*") // Lấy ra phần gốc: github.com/smtdfc/nagare/cli
+
+			// Nếu pkgID trùng khớp chính xác với thư mục cha HOẶC nằm sâu bên trong các con cháu của nó
+			if pkgID == prefix || strings.HasPrefix(pkgID, prefix+"/") {
+				return true
+			}
+		}
+		if prefix, ok := strings.CutSuffix(pattern, "..."); ok {
+			if strings.HasPrefix(pkgID, prefix) {
+				return true
+			}
+			continue
+		}
+
+		if strings.Contains(pattern, "*") {
+			if matched, err := path.Match(pattern, pkgID); err == nil && matched {
+				return true
+			}
+			continue
+		}
+
+		if pkgID == pattern || strings.Contains(pkgID, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
 func NewParser() *Parser {
 	return &Parser{}
 }

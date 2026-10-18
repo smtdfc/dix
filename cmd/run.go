@@ -39,7 +39,11 @@ Example:
 
 		p := parser.NewParser()
 		g := generator.NewGenerator()
-		mt, err := p.ParseWithOptions(targetDir, parser.ScanOptions{Workspace: runWorkspace, NoCache: runNoCache})
+		mt, err := p.ParseWithOptions(targetDir, parser.ScanOptions{
+			Workspace:      runWorkspace,
+			NoCache:        runNoCache,
+			IgnorePackages: config.IgnorePackages,
+		})
 		if err != nil {
 			fatalDixError(err)
 		}

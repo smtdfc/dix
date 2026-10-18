@@ -29,7 +29,11 @@ var wireCmd = &cobra.Command{
 
 		p := parser.NewParser()
 		g := generator.NewGenerator()
-		mt, err := p.ParseWithOptions(targetDir, parser.ScanOptions{Workspace: wireWorkspace, NoCache: wireNoCache})
+		mt, err := p.ParseWithOptions(targetDir, parser.ScanOptions{
+			Workspace:      wireWorkspace,
+			NoCache:        wireNoCache,
+			IgnorePackages: config.IgnorePackages,
+		})
 		if err != nil {
 			fatalDixError(err)
 		}
