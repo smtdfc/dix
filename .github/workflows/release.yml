@@ -1,35 +1,28 @@
-name: Release
+name: Release Please
 
 on:
   push:
     branches:
-      - release
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
 
 jobs:
   release:
-    name: Semantic Release
+    name: Release
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Run Release Please
+        uses: google-github-actions/release-please-action@v4
+        id: release
         with:
-          fetch-depth: 0
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run Semantic Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
