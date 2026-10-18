@@ -6,7 +6,7 @@
 ### Features
 
 * add @Disable annotation support for providers and update error handling ([65a9eac](https://github.com/smtdfc/dix/commit/65a9eac2f9b254d1df38f4251d60ce87fde1dc76))
-* Add annonation [@disable](https://github.com/disable) [@final](https://github.com/final) ([4faa6ba](https://github.com/smtdfc/dix/commit/4faa6ba85ec8d9b99cc8de66099fb70292613e6f))
+* Add annotation `@disable` and `@final` ([4faa6ba](https://github.com/smtdfc/dix/commit/4faa6ba85ec8d9b99cc8de66099fb70292613e6f))
 * add configuration support for output path and enhance error handling ([1aa6c8f](https://github.com/smtdfc/dix/commit/1aa6c8f04ecf6e697bfb5143acdf89fa6f62aae8))
 * add JSON annotations to struct fields and implement metadata saving/loading functionality ([1f1c763](https://github.com/smtdfc/dix/commit/1f1c763bf7bf1e7a60b331b69efb0be1c9620b5a))
 * Add void type ([7fabc96](https://github.com/smtdfc/dix/commit/7fabc9603af37d0f1fb9c5fb8e3c935e6e3043b8))
