@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="JsonSchemaMappingsProjectConfiguration">
+    <state>
+      <map>
+        <entry key="package.json">
+          <value>
+            <SchemaInfo>
+              <option name="name" value="package.json" />
+              <option name="relativePathToSchema" value="https://www.schemastore.org/package.json" />
+              <option name="applicationDefined" value="true" />
+              <option name="patterns">
+                <list>
+                  <Item>
+                    <option name="path" value="package.json" />
+                  </Item>
+                </list>
+              </option>
+            </SchemaInfo>
+          </value>
+        </entry>
+        <entry key="release-please-config.json">
+          <value>
+            <SchemaInfo>
+              <option name="name" value="release-please-config.json" />
+              <option name="relativePathToSchema" value="https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json" />
+              <option name="applicationDefined" value="true" />
+              <option name="patterns">
+                <list>
+                  <Item>
+                    <option name="path" value="release-please-config.json" />
+                  </Item>
+                </list>
+              </option>
+            </SchemaInfo>
+          </value>
+        </entry>
+        <entry key="release-please-manifest.json">
+          <value>
+            <SchemaInfo>
+              <option name="name" value="release-please-manifest.json" />
+              <option name="relativePathToSchema" value="https://raw.githubusercontent.com/googleapis/release-please/main/schemas/manifest.json" />
+              <option name="applicationDefined" value="true" />
+              <option name="patterns">
+                <list>
+                  <Item>
+                    <option name="path" value=".release-please-manifest.json" />
+                  </Item>
+                </list>
+              </option>
+            </SchemaInfo>
+          </value>
+        </entry>
+      </map>
+    </state>
+  </component>
+</project>
