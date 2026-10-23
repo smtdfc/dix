@@ -40,12 +40,15 @@ Example:
 			targetDir = args[1]
 		}
 
+		ignorePackages := config.IgnorePackages
+		ignorePackages = append(ignorePackages, buildIgnorePackages...)
+
 		p := parser.NewParser()
 		g := generator.NewGenerator()
 		mt, err := p.ParseWithOptions(targetDir, parser.ScanOptions{
 			Workspace:      buildWorkspace,
 			NoCache:        buildNoCache,
-			IgnorePackages: config.IgnorePackages,
+			IgnorePackages: ignorePackages,
 		})
 		if err != nil {
 			fatalDixError(err)
@@ -89,6 +92,7 @@ Example:
 
 var buildWorkspace bool
 var buildNoCache bool
+var buildIgnorePackages []string
 
 func init() {
 	buildCmd.Flags().BoolVar(&buildWorkspace, "workspace", false, "scan every module declared in the nearest go.work file")

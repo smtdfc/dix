@@ -224,6 +224,11 @@ func findModuleRoot(dir string) (string, error) {
 
 func (p *Parser) parseModule(dir string, metadata *Metadata, providers map[string]*Provider, ignorePkgs []string) error {
 
+	matcher, err := NewIgnoreMatcher(ignorePkgs)
+	if err != nil {
+		return err
+	}
+
 	cfg := &packages.Config{
 		Dir:        dir,
 		BuildFlags: []string{"-tags=dix"},
@@ -240,11 +245,14 @@ func (p *Parser) parseModule(dir string, metadata *Metadata, providers map[strin
 	}
 
 	var parseErr error
+	ignored := 0
+	scanned := 0
 	for _, pkg := range pkgs {
-		if shouldIgnorePkg(pkg.ID, ignorePkgs) {
-			fmt.Printf("\033[32m[Ignore]\033[0m Package: %s \n", pkg.ID)
+		if matcher.ShouldIgnore(pkg.ID) {
+			ignored++
 			continue
 		}
+		scanned++
 		if len(pkg.Errors) > 0 {
 			return NewPackageLoadError(pkg.Errors[0])
 		}
@@ -306,6 +314,10 @@ func (p *Parser) parseModule(dir string, metadata *Metadata, providers map[strin
 
 		}
 
+	}
+
+	if ignored > 0 {
+		fmt.Printf("\033[36m[Ignore]\033[0m %d package(s) ignored, %d scanned\n", ignored, scanned)
 	}
 
 	return nil
