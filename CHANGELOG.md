@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/smtdfc/dix/compare/v1.1.0...v1.2.0) (2026-10-23)
+
+
+### Features
+
+* **ignore:** pre-compile ignore patterns and add --ignore-package CLI flag ([a0552e1](https://github.com/smtdfc/dix/commit/a0552e1eb0e7f678400970b39be2fd0fdf0122e9))
+
 ## [1.1.0](https://github.com/smtdfc/dix/compare/v1.0.0...v1.1.0) (2026-10-18)
 
 
