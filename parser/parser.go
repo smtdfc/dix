@@ -388,12 +388,12 @@ func findGoWork(dir string) (string, error) {
 	}
 }
 
+// shouldIgnorePkg giữ lại để tương thích ngang với mã cũ.
+// Logic mới được triển khai trong IgnoreMatcher (xem parser/ignore.go).
 func shouldIgnorePkg(pkgID string, ignorePatterns []string) bool {
 	for _, pattern := range ignorePatterns {
 		if strings.HasSuffix(pattern, "/*") {
-			prefix := strings.TrimSuffix(pattern, "/*") // Lấy ra phần gốc: github.com/smtdfc/nagare/cli
-
-			// Nếu pkgID trùng khớp chính xác với thư mục cha HOẶC nằm sâu bên trong các con cháu của nó
+			prefix := strings.TrimSuffix(pattern, "/*")
 			if pkgID == prefix || strings.HasPrefix(pkgID, prefix+"/") {
 				return true
 			}
@@ -404,14 +404,12 @@ func shouldIgnorePkg(pkgID string, ignorePatterns []string) bool {
 			}
 			continue
 		}
-
 		if strings.Contains(pattern, "*") {
 			if matched, err := path.Match(pattern, pkgID); err == nil && matched {
 				return true
 			}
 			continue
 		}
-
 		if pkgID == pattern || strings.Contains(pkgID, pattern) {
 			return true
 		}

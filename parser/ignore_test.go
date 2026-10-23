@@ -99,7 +99,6 @@ func TestIgnoreMatcherEmptyPatterns(t *testing.T) {
 }
 
 func TestShouldIgnorePkgDeprecated(t *testing.T) {
-	// Giữ lại để đảm bảo hàm cũ không panic và không làm sai kết quả cơ bản
 	patterns := []string{"github.com/foo/bar/..."}
 	if !shouldIgnorePkg("github.com/foo/bar/baz", patterns) {
 		t.Error("shouldIgnorePkg should still work")
@@ -109,7 +108,6 @@ func TestShouldIgnorePkgDeprecated(t *testing.T) {
 	}
 }
 
-// Benchmark so sánh O(N×M) cũ vs matcher mới
 func BenchmarkIgnoreMatcher(b *testing.B) {
 	patterns := []string{
 		"github.com/foo/bar/...",
