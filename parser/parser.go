@@ -37,9 +37,12 @@ func isDixSingletonNamed(named *types.Named) bool {
 }
 
 func (p *Parser) ParseProvider(pkg *packages.Package, file *ast.File, fn *ast.FuncDecl) (*Provider, error) {
+	fnPos := pkg.Fset.Position(fn.Pos())
 	c := &Provider{
 		Name:        fn.Name.Name,
-		File:        pkg.Fset.Position(file.Package).Filename,
+		File:        fnPos.Filename,
+		Line:        fnPos.Line,
+		Column:      fnPos.Column,
 		PackagePath: pkg.PkgPath,
 		PackageName: pkg.Name,
 	}
@@ -65,22 +68,28 @@ func (p *Parser) ParseProvider(pkg *packages.Package, file *ast.File, fn *ast.Fu
 					}
 				case *types.Pointer:
 					if n, ok := t.Elem().(*types.Named); ok && isDixSingletonNamed(n) {
-						return nil, NewValidationError(
+						pos := pkg.Fset.Position(field.Pos())
+						return nil, NewValidationErrorWithLocation(
 							"singleton dependency must be `di.Singleton[T]`, not `*di.Singleton[T]`",
 							fn.Name.Name,
 							name.Name,
-							c.File,
+							pos.Filename,
+							pos.Line,
+							pos.Column,
 						)
 					}
 				}
 
 				if singletonNamed != nil {
 					if isPointerAtAST {
-						return nil, NewValidationError(
+						pos := pkg.Fset.Position(field.Pos())
+						return nil, NewValidationErrorWithLocation(
 							"singleton dependency must be `di.Singleton[T]`, not pointer form",
 							fn.Name.Name,
 							name.Name,
-							c.File,
+							pos.Filename,
+							pos.Line,
+							pos.Column,
 						)
 					}
 
@@ -99,6 +108,7 @@ func (p *Parser) ParseProvider(pkg *packages.Package, file *ast.File, fn *ast.Fu
 				typeName, isPtr := parseTypeDetails(*depType)
 				pkgPath := getPackagePath(*depType)
 
+				depPos := pkg.Fset.Position(name.Pos())
 				c.Deps = append(c.Deps, &Dependency{
 					Name: name.Name,
 					Type: &TypeInfo{
@@ -107,36 +117,47 @@ func (p *Parser) ParseProvider(pkg *packages.Package, file *ast.File, fn *ast.Fu
 						IsPointer: isPtr,
 					},
 					IsSingleton: isSingleton,
+					File:        depPos.Filename,
+					Line:        depPos.Line,
+					Column:      depPos.Column,
 				})
 			}
 		}
 	}
 
 	if fn.Type.Results == nil || len(fn.Type.Results.List) == 0 {
-		return nil, NewValidationError(
+		return nil, NewValidationErrorWithLocation(
 			"provider function must return one value or (value, error)",
 			fn.Name.Name,
 			"",
-			c.File,
+			fnPos.Filename,
+			fnPos.Line,
+			fnPos.Column,
 		)
 	}
 
 	if len(fn.Type.Results.List) > 2 || len(fn.Type.Results.List[0].Names) > 1 {
-		return nil, NewValidationError(
+		resPos := pkg.Fset.Position(fn.Type.Results.Pos())
+		return nil, NewValidationErrorWithLocation(
 			"provider function must return one value or (value, error)",
 			fn.Name.Name,
 			"",
-			c.File,
+			resPos.Filename,
+			resPos.Line,
+			resPos.Column,
 		)
 	}
 	if len(fn.Type.Results.List) == 2 {
 		errorResult := fn.Type.Results.List[1]
 		if len(errorResult.Names) > 1 || !isBuiltinError(pkg.TypesInfo.TypeOf(errorResult.Type)) {
-			return nil, NewValidationError(
+			errPos := pkg.Fset.Position(errorResult.Pos())
+			return nil, NewValidationErrorWithLocation(
 				"the second provider return value must be error",
 				fn.Name.Name,
 				"",
-				c.File,
+				errPos.Filename,
+				errPos.Line,
+				errPos.Column,
 			)
 		}
 		c.ReturnsError = true
@@ -278,9 +299,10 @@ func (p *Parser) parseModule(dir string, metadata *Metadata, providers map[strin
 
 					if containsRootAnnotation(fn.Doc.Text()) {
 						if metadata.Root != nil {
-							parseErr = NewValidationError(
+							fnPos := pkg.Fset.Position(fn.Pos())
+							parseErr = NewValidationErrorWithLocation(
 								fmt.Sprintf("multiple @Root providers: %s and %s", metadata.Root.Name, m.Name),
-								m.Name, "", m.File,
+								m.Name, "", fnPos.Filename, fnPos.Line, fnPos.Column,
 							)
 							return false
 						}
@@ -288,9 +310,10 @@ func (p *Parser) parseModule(dir string, metadata *Metadata, providers map[strin
 					} else {
 						key := m.Return.Type.Signature()
 						if existing, exists := providers[key]; exists {
-							parseErr = NewValidationError(
-								fmt.Sprintf("duplicate provider for %s: %s (%s) and %s (%s)", m.Return.Type.String(), existing.Name, existing.File, m.Name, m.File),
-								m.Name, "", m.File,
+							fnPos := pkg.Fset.Position(fn.Pos())
+							parseErr = NewValidationErrorWithLocation(
+								fmt.Sprintf("duplicate provider for %s: %s (%s) and %s (%s)", m.Return.Type.String(), existing.Name, existing.LocationString(), m.Name, m.LocationString()),
+								m.Name, "", fnPos.Filename, fnPos.Line, fnPos.Column,
 							)
 							return false
 						}
