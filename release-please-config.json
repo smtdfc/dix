@@ -2,7 +2,7 @@
   "packages": {
     ".": {
       "release-type": "go",
-      "draft": true
+      "draft": false
     }
   }
 }
