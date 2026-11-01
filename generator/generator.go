@@ -56,13 +56,19 @@ func (g *Generator) GenerateDepWithMap(dep *parser.Dependency, scope *Scope, pro
 
 		provider, ok := providerMap[dep.Type.Signature()]
 		if !ok {
-			return nil, NewGenerateError(
+			genErr := NewGenerateError(
 				ErrorDependencyResolve,
 				"singleton dependency provider not found",
 				"",
 				dep.Type.Signature(),
 				nil,
 			)
+			if dep.File != "" {
+				genErr.File = dep.File
+				genErr.Line = dep.Line
+				genErr.Column = dep.Column
+			}
+			return nil, genErr
 		}
 
 		providerCall, err := g.GenerateCallProviderWithMap(provider, scope, providerMap)
@@ -99,13 +105,19 @@ func (g *Generator) GenerateDepWithMap(dep *parser.Dependency, scope *Scope, pro
 
 	ident, ok := scope.Names[dep.Type.Signature()]
 	if !ok {
-		return nil, NewGenerateError(
+		genErr := NewGenerateError(
 			ErrorDependencyResolve,
 			"dependency is not available in generated container scope",
 			"",
 			dep.Type.Signature(),
 			nil,
 		)
+		if dep.File != "" {
+			genErr.File = dep.File
+			genErr.Line = dep.Line
+			genErr.Column = dep.Column
+		}
+		return nil, genErr
 	}
 
 	return ident, nil
@@ -229,7 +241,13 @@ func (g *Generator) Generate(metadata *parser.Metadata) (string, error) {
 	lastComp := sorted[len(sorted)-1]
 	finalID, ok := scope.Names[lastComp.Return.Type.Signature()]
 	if !ok {
-		return "", NewGenerateError(ErrorCodeGeneration, "failed to resolve root provider identifier", lastComp.Name, "", nil)
+		genErr := NewGenerateError(ErrorCodeGeneration, "failed to resolve root provider identifier", lastComp.Name, "", nil)
+		if lastComp != nil {
+			genErr.File = lastComp.File
+			genErr.Line = lastComp.Line
+			genErr.Column = lastComp.Column
+		}
+		return "", genErr
 	}
 
 	var finalExpr ast.Expr = finalID

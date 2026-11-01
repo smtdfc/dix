@@ -22,13 +22,19 @@ func (g *Graph) Sort() ([]*parser.Provider, error) {
 	var visit func(n *Node) error
 	visit = func(n *Node) error {
 		if status[n] == 1 {
-			return NewGenerateError(
+			genErr := NewGenerateError(
 				ErrorDependencyResolve,
 				"circular dependency detected",
 				n.Provider.Name,
 				"",
 				nil,
 			)
+			if n.Provider != nil {
+				genErr.File = n.Provider.File
+				genErr.Line = n.Provider.Line
+				genErr.Column = n.Provider.Column
+			}
+			return genErr
 		}
 		if status[n] == 2 {
 			return nil
@@ -60,13 +66,17 @@ func BuildGraph(root *parser.Provider, providerMap ProviderMap) (*Graph, error) 
 	var buildNode func(p *parser.Provider) (*Node, error)
 	buildNode = func(p *parser.Provider) (*Node, error) {
 		if p.Return == nil {
-			return nil, NewGenerateError(
+			genErr := NewGenerateError(
 				ErrorValidation,
 				"provider must declare exactly one return value",
 				p.Name,
 				"",
 				nil,
 			)
+			genErr.File = p.File
+			genErr.Line = p.Line
+			genErr.Column = p.Column
+			return nil, genErr
 		}
 
 		sig := p.Return.Type.Signature()
@@ -76,13 +86,17 @@ func BuildGraph(root *parser.Provider, providerMap ProviderMap) (*Graph, error) 
 		}
 
 		if p.IsDisable {
-			return nil, NewGenerateError(
+			genErr := NewGenerateError(
 				ErrorDependencyResolve,
 				"disabled provider cannot be used as dependency or root",
 				p.Name,
 				"",
 				nil,
 			)
+			genErr.File = p.File
+			genErr.Line = p.Line
+			genErr.Column = p.Column
+			return nil, genErr
 		}
 
 		node := &Node{
@@ -96,24 +110,44 @@ func BuildGraph(root *parser.Provider, providerMap ProviderMap) (*Graph, error) 
 
 			childProvider, ok := providerMap[depSig]
 			if !ok {
-				return nil, NewGenerateError(
+				genErr := NewGenerateError(
 					ErrorDependencyResolve,
 					"provider not found for dependency",
 					p.Name,
 					dep.String(),
 					nil,
 				)
+				if dep.File != "" {
+					genErr.File = dep.File
+					genErr.Line = dep.Line
+					genErr.Column = dep.Column
+				} else if p.File != "" {
+					genErr.File = p.File
+					genErr.Line = p.Line
+					genErr.Column = p.Column
+				}
+				return nil, genErr
 			}
 
 			childNode, err := buildNode(childProvider)
 			if err != nil {
-				return nil, NewGenerateError(
+				genErr := NewGenerateError(
 					ErrorGraphBuild,
 					"failed to build provider graph",
 					p.Name,
 					dep.Name,
 					err,
 				)
+				if dep.File != "" {
+					genErr.File = dep.File
+					genErr.Line = dep.Line
+					genErr.Column = dep.Column
+				} else if p.File != "" {
+					genErr.File = p.File
+					genErr.Line = p.Line
+					genErr.Column = p.Column
+				}
+				return nil, genErr
 			}
 			node.Deps = append(node.Deps, childNode)
 		}
