@@ -2,53 +2,64 @@
 
 Zero-magic, compile-time Dependency Injection for Go.
 
-Dix scans your Go source code, builds a dependency graph from annotations in doc comments, and generates wiring code at `dix/generated/root.go`.
+Dix scans your Go source code, builds a dependency graph from annotations in doc comments, and generates clean, explicit wiring code into `generated/dix/root.go`.
 
 Instead of runtime reflection, Dix produces plain Go code that is easy to read, debug, and review.
 
-## Tính năng chính
+---
 
-- **Compile-time safety**: phát hiện thiếu dependency và vòng tròn dependency ngay lúc sinh mã, không chờ chạy chương trình.
-- **Zero reflection**: không có chi phí runtime, tốc độ gần với mã viết tay.
-- **Explicit output**: mã sinh ra là Go thuần sẽ đọc và debug dễ dàng.
-- **Workflow đơn giản**: một CLI nhỏ phù hợp vào luồng `go run` và `go build`.
-- **Ignore packages**: bỏ qua các package không cần scan (giúp scan nhanh hơn trên project lớn).
-- **Scan cache**: lưu metadata đã scan vào `.dix/cache`, chỉ quét lại khi source thay đổi.
+## Key Features
 
-## Cài đặt
+- **Compile-Time Safety**: Catch missing dependencies and circular dependency cycles during code generation—before your application runs.
+- **Rich Error Diagnostics**: Beautiful, compiler-grade terminal diagnostics with exact file paths, line & column numbers, source code snippets with caret pointers, and actionable hints.
+- **Zero Reflection**: No runtime reflection overhead; wiring performance matches hand-written Go.
+- **Explicit Output**: Generates readable, standard Go code that is straightforward to debug, inspect, and trace.
+- **Seamless Workflow**: A lightweight CLI that fits directly into your daily `go run` and `go build` routines.
+- **Package Ignoring**: Exclude packages you don't need to scan (e.g., mocks, third-party code) with glob and exact patterns to accelerate scans on large codebases.
+- **Smart Scan Cache**: Persists parsed metadata in `.dix/cache` using content fingerprints, only rescanning when files actually change.
+
+---
+
+## Installation
 
 ```bash
 go install github.com/smtdfc/dix@latest
 ```
 
-Kiểm tra:
+Verify your installation:
 
 ```bash
 dix --help
 ```
 
-## Nguyên lý hoạt động
+---
 
-1. Quét source code tìm các hàm đánh dấu `@Injectable`.
-2. Xác định composition root đánh dấu `@Root`.
-3. Xây dựng dependency graph và kiểm tra vòng tròn.
-4. Sinh mã wiring vào `dix/generated/root.go`.
-5. Chạy `go run .` hoặc `go build <target>` tùy lệnh bạn chọn.
+## How It Works
 
-### Build tag `!dix`
+1. **Scans** your Go source code for provider functions marked with `@Injectable`.
+2. **Identifies** the composition root marked with `@Root`.
+3. **Builds** the dependency graph and validates it against missing dependencies and cycles.
+4. **Generates** explicit wiring code into `./generated/dix/root.go`.
+5. **Executes** `go run .` or `go build <target>` according to your command.
 
-Mã sinh ra có header:
+### The `!dix` Build Tag
+
+The generated code includes a build tag header:
 
 ```go
 //go:build !dix
 // +build !dix
 ```
 
-Dix quét source với build tag `-tags=dix`. Nếu bạn không thêm tag này khi build dự án, file generated sẽ **bị bỏ qua** (do `!dix`) và không gây xung đột với các provider định nghĩa thường xuyên. Điều này tránh trùng ký hiệu khi Dix chạy trong quá trình build dự án.
+Dix scans your source code with the `-tags=dix` build flag. When building your application normally without this tag, the generated file is **skipped** (due to `!dix`), preventing symbol collisions while Dix runs during your build pipeline.
+
+---
 
 ## Quick Start
 
-### 1. Định nghĩa provider
+### 1. Define Providers
+
+Add doc annotations to your constructor functions:
 
 ```go
 package app
@@ -77,7 +88,7 @@ func NewMessage(service *Service) string {
 }
 ```
 
-### 2. Dùng generated root trong `main.go`
+### 2. Use Generated Root in `main.go`
 
 ```go
 package main
@@ -85,11 +96,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/your-org/your-app/dix/generated"
+	"github.com/your-org/your-app/generated/dix"
 )
 
 func main() {
-	msg, err := generated.Root()
+	msg, err := dix.Root()
 	if err != nil {
 		panic(err)
 	}
@@ -97,21 +108,21 @@ func main() {
 }
 ```
 
-### 3. Sinh mã và chạy
+### 3. Generate Wiring and Run
 
 ```bash
 dix run .
 ```
 
-## Lệnh CLI
+---
+
+## CLI Commands
 
 ### `dix run [directory]`
 
-Quét source, sinh mã wiring, rồi thực thi `go run .`.
+Scans source code, generates wiring, and runs `go run .`.
 
-- `directory` là tùy chọn, mặc định `.`.
-
-Ví dụ:
+- `directory` is optional (defaults to `.`).
 
 ```bash
 dix run .
@@ -122,12 +133,10 @@ dix run . --ignore-package internal/mock
 
 ### `dix build [target] [directory]`
 
-Kết hợp sinh mã và compile binary.
+Generates wiring code and compiles the Go binary.
 
-- `target` là tùy chọn, mặc định `main.go`.
-- `directory` là tùy chọn, mặc định `.`.
-
-Ví dụ:
+- `target` is optional (defaults to `main.go`).
+- `directory` is optional (defaults to `.`).
 
 ```bash
 dix build
@@ -139,11 +148,9 @@ dix build . --ignore-package github.com/foo/bar
 
 ### `dix wire [directory]`
 
-Chỉ sinh mã wiring, không build và không chạy.
+Generates wiring code only, without building or running.
 
-- `directory` là tùy chọn, mặc định `.`.
-
-Ví dụ:
+- `directory` is optional (defaults to `.`).
 
 ```bash
 dix wire
@@ -153,27 +160,27 @@ dix wire --workspace ./apps/api
 
 ### `dix cache clean [directory]`
 
-Xóa toàn bộ scan cache của Dix (thư mục `.dix/cache`).
+Removes all Dix scan cache files (the `.dix/cache` directory).
 
-- `directory` là tùy chọn, mặc định `.`.
-
-Ví dụ:
+- `directory` is optional (defaults to `.`).
 
 ```bash
 dix cache clean .
 ```
 
-### Danh sách flag chung
+### Global Flags
 
-| Flag | Ý nghĩa | Áp dụng cho |
-|------|---------|-------------|
-| `--workspace` | Quét mọi module trong `go.work` gần nhất | `run`, `build`, `wire` |
-| `--no-cache` | Bỏ qua cache, quét lại từ đầu | `run`, `build`, `wire` |
-| `--ignore-package` | Bỏ qua một package theo ID (có thể lặp nhiều lần) | `run`, `build`, `wire` |
+| Flag | Description | Supported Commands |
+|------|-------------|---------------------|
+| `--workspace` | Scan every module declared in the nearest `go.work` file | `run`, `build`, `wire` |
+| `--no-cache` | Ignore cached metadata and perform a full rescan | `run`, `build`, `wire` |
+| `--ignore-package` | Exclude a package ID from scanning (repeatable) | `run`, `build`, `wire` |
 
-## Cấu hình `dix.config.json`
+---
 
-Tạo file `dix.config.json` tại thư mục gốc dự án:
+## Configuration (`dix.config.json`)
+
+Create a `dix.config.json` file in your project root:
 
 ```json
 {
@@ -186,30 +193,31 @@ Tạo file `dix.config.json` tại thư mục gốc dự án:
 }
 ```
 
-| Trường | Kiểu | Ý nghĩa |
-|--------|------|---------|
-| `ignore_packages` | `[]string` | Danh sách package bỏ qua khi scan |
-| `output` | `string` | Đường dẫn file generated (mặc định `./generated/dix/root.go`) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `ignore_packages` | `[]string` | List of package patterns to skip when scanning |
+| `output` | `string` | Target path for the generated file (defaults to `./generated/dix/root.go`) |
 
-Giá trị từ file config sẽ được **ghép** với giá trị từ flag `--ignore-package`.
+> [!NOTE]
+> Values configured in `dix.config.json` are automatically merged with any `--ignore-package` flags specified via the CLI.
+
+---
 
 ## Annotations
 
-Tất cả annotation đều viết trên một dòng riêng trong doc comment của hàm.
+Annotations must be placed on their own line inside the provider function's doc comment.
 
 ### `@Injectable`
 
-Đánh dấu hàm là một provider hợp lệ trong dependency graph.
+Marks a function as a valid provider within the dependency graph.
 
 ### `@Root`
 
-Đánh dấu composition root (điểm bắt đầu Dix duyệt dependency). Một graph chỉ có đúng **một** `@Root`, và phải đi kèm với `@Injectable`.
+Marks the composition root (the entry point where Dix starts traversing dependencies). Exactly **one** `@Root` is permitted per application, and it must accompany `@Injectable`.
 
 ### `@Singleton`
 
-Đánh dấu kết quả của provider là singleton, được bọc trong `di.Singleton[T]`. Khi một dependency cần singleton, Dix sẽ sinh mã gọi provider rồi gói vào `di.NewSingleton(...)`.
-
-Ví dụ:
+Marks the provider's returned instance as a singleton wrapped inside `di.Singleton[T]`. Dix generates code that calls the provider once and encapsulates it with `di.NewSingleton(...)`.
 
 ```go
 // @Injectable
@@ -219,11 +227,18 @@ func NewDatabase() *Database {
 }
 ```
 
+Inject singletons by value using `di.Singleton[T]`:
+
+```go
+// @Injectable
+func NewUserRepository(db di.Singleton[*Database]) *UserRepository {
+	return &UserRepository{db: db.Get()}
+}
+```
+
 ### `@Disable`
 
-Đánh dấu provider bị tắt. Provider này sẽ **không** được sinh mã và không thể dùng làm dependency hay root.
-
-Ví dụ:
+Deactivates a provider. The function will **not** be wired and cannot be used as a dependency or root.
 
 ```go
 // @Injectable
@@ -233,21 +248,46 @@ func OldProvider() *OldService {
 }
 ```
 
-### Quy tắc quan trọng
+### Important Rules
 
-- `@Root` phải luôn đi cùng `@Injectable`.
-- Một graph chỉ có duy nhất một `@Root`.
-- Một kiểu chỉ được có đúng một provider trong toàn bộ các module được quét.
-- Kiểu dependency phải khớp chính xác (`T` khác `*T`).
-- Provider trả về đúng một giá trị, hoặc `(value, error)`. Đối với dạng trả lỗi, sinh mã sẽ panic nếu error không nil.
+- `@Root` must always be paired with `@Injectable`.
+- Exactly one `@Root` provider is allowed across the entire scanned graph.
+- Each type must have only **one** provider (duplicate providers for the same type trigger a validation error).
+- Dependency types must match exactly (`T` is distinct from `*T`).
+- Provider functions must return either `T` or `(T, error)`. If an error-returning provider fails at startup, the generated code returns the error.
 
-## Bỏ qua package (`ignore packages`)
+---
 
-Khi dự án lớn, bạn có thể không muốn Dix quét các package như `internal/mock`, thư viện của bên thứ ba, hoặc mã cũ.
+## Error Diagnostics
 
-### Cách cấu hình
+When Dix detects an issue during graph analysis or code generation, it outputs a clean, compiler-grade diagnostic complete with the exact file, line, column, and a source code preview:
 
-Trong `dix.config.json`:
+```text
+[Dix Error] Dependency Resolution Error: provider not found for dependency
+
+  --> internal/app/service.go:4:17
+     │
+   3 │ // @Injectable
+   4 │ func NewMessage(repo *Repo) string {
+     │                 ^^^^
+   5 │ 	return "hello"
+     │
+
+  Provider:   NewMessage
+  Dependency: repo (type of *Repo in package app)
+
+  💡 Hint: Ensure a provider function returning this type is defined, annotated with @Injectable, and its package is not ignored in dix.config.json.
+```
+
+---
+
+## Ignoring Packages
+
+For large projects, you may want to prevent Dix from scanning mock directories, vendor trees, or legacy code.
+
+### Configuration
+
+In `dix.config.json`:
 
 ```json
 {
@@ -255,66 +295,71 @@ Trong `dix.config.json`:
 }
 ```
 
-Hoặc qua flag CLI (lặp được, ghép với config):
+Or via CLI flags (repeatable, merged with config):
 
 ```bash
 dix run . --ignore-package internal/mock --ignore-package github.com/foo/bar
 ```
 
-### Các mẫu pattern được hỗ trợ
+### Supported Patterns
 
-| Mẫu | Khớp với |
-|-----|----------|
-| `github.com/foo/bar` | Chính xác gói `github.com/foo/bar` (không khớp sub-package) |
-| `github.com/foo/bar/...` | Gói `bar` và mọi gói con bên dưới |
-| `github.com/foo/bar/*` | Chính xác `bar` và gói con trực tiếp `bar/*` |
-| `github.com/foo/*bar*` | Glob (dấu `*` đại diện cho mọi ký tự trừ `/`) |
-| `internal/mock` | Chính xác `internal/mock` (không làm fuzzy match) |
+| Pattern | Matches |
+|---------|---------|
+| `github.com/foo/bar` | Exactly the package `github.com/foo/bar` (does not match sub-packages) |
+| `github.com/foo/bar/...` | Package `bar` and all descendant sub-packages |
+| `github.com/foo/bar/*` | Package `bar` and its immediate children `bar/*` |
+| `github.com/foo/*bar*` | Glob pattern (`*` matches any sequence of non-slash characters) |
+| `internal/mock` | Exact match for `internal/mock` |
 
-> Lưu ý: Pattern thuần túy giờ đây là **exact match** (không dùng `strings.Contains` nữa), nên sẽ không bị false-positive như `"foo"` khớp `"foobar"`.
+When one or more packages are ignored, Dix outputs a clean summary:
 
-Khi có ít nhất một package bị bỏ qua, Dix sẽ in tóm tát thay vì spam log từng gói:
-
-```
+```text
 [Ignore] 3 package(s) ignored, 42 scanned
 ```
 
-## Scan cache
+---
 
-Dix lưu metadata đã quét thành công vào `.dix/cache/<fingerprint>.json`.
+## Scan Cache
 
-Fingerprint được tính từ:
-- Phiên bản Go (`runtime.Version()`)
-- Chế độ scan (`--workspace` hay không)
-- Nội dung các file `.go`, `go.mod`, `go.sum` trong thư mục quét
-- File `go.work` nếu dùng `--workspace`
+Dix stores validated metadata in `.dix/cache/<fingerprint>.json`.
 
-Cache bị hủy và quét lại khi một trong những yếu tố trên thay đổi.
+The cache fingerprint is computed from:
+- Go version (`runtime.Version()`)
+- Scan mode (`--workspace` status)
+- Contents of `.go`, `go.mod`, and `go.sum` files within scanned directories
+- The `go.work` file if using `--workspace`
 
-- Ép quét lại: dùng flag `--no-cache`.
-- Xóa toàn bộ cache: `dix cache clean .`.
+The cache is automatically invalidated when any of these inputs change.
 
-## Kết quả sinh ra
+- **Force a rescan**: Pass the `--no-cache` flag.
+- **Clear cache**: Run `dix cache clean .`.
 
-| File | Ý nghĩa |
-|------|---------|
-| `dix/generated/root.go` | Mã wiring được sinh ra (chứa hàm `Root()`) |
-| `scan_<timestamp>.dix` | Tệp metadata intermediate từ lần quét |
+---
 
-## Lỗi thường gặp
+## Generated Artifacts
 
-| Lỗi | Nguyên nhân |
-|-----|-------------|
-| `multiple @Root providers` | Hai hàm trở lên đánh dấu `@Root`. |
-| `duplicate provider for ...` | Hai provider trả về cùng kiểu trong cùng graph. |
-| `provider not found for dependency` | Không tìm thấy provider cho một kiểu dependency. |
-| `circular dependency detected` | Có chu trình dependency trong graph. |
-| `singleton dependency must be di.Singleton[T]` | Dependency singleton sai định dạng. |
-| `failed to load Go packages` | Lỗi load package Go (thường do lỗi cú pháp hoặc module). |
+| File | Description |
+|------|-------------|
+| `generated/dix/root.go` | The generated wiring code containing the `Root()` entry function |
+| `.dix/scan_<timestamp>.dix` | Intermediate metadata snapshot from the scan |
+| `.dix/cache/<hash>.json` | Cached scan metadata |
 
-Tất cả lỗi được in ra với stack nguyên nhân (nếu có) để bạn dễ dàng định vị nguồn gốc.
+---
 
-## Đóng góp
+## Common Errors & Troubleshooting
+
+| Error | Cause & Solution |
+|-------|------------------|
+| `multiple @Root providers` | Two or more functions are marked with `@Root`. Keep `@Root` on only one entry point. |
+| `duplicate provider for ...` | Two providers return the same type. Remove one, rename the type, or mark the unused one with `@Disable`. |
+| `provider not found for dependency` | A dependency is missing a provider. Ensure a provider function returns the required type and has the `@Injectable` annotation. |
+| `circular dependency detected` | A dependency loop was found. Restructure your dependencies or use `di.Singleton[T]` to resolve the cycle. |
+| `singleton dependency must be di.Singleton[T]` | Singletons must be passed by value (`di.Singleton[T]`), not as a pointer (`*di.Singleton[T]`). |
+| `failed to load Go packages` | Go packages failed to load (usually due to a syntax error or missing module). Check your code with `go build`. |
+
+---
+
+## Contributing
 
 ```bash
 git clone https://github.com/smtdfc/dix.git
@@ -322,20 +367,24 @@ cd dix
 go test ./...
 ```
 
-Mở issue hoặc pull request nếu bạn muốn cải thiện tính năng hoặc tài liệu.
+Contributions, bug reports, and pull requests are welcome!
 
-## Tài liệu chi tiết
+---
 
-| Chủ đề | File |
-|--------|------|
-| Hướng dẫn bắt đầu | `docs/getting-started.md` |
-| Cài đặt | `docs/installation.md` |
-| Annotations | `docs/annotations.md` |
-| Build và Run | `docs/build.md` |
-| Scan Cache | `docs/cache.md` |
-| Bỏ qua package | `docs/ignore.md` |
-| Lỗi thường gặp | `docs/common-errors.md` |
+## Documentation
 
-## Giấy phép
+| Guide | File |
+|-------|------|
+| Getting Started | [`docs/getting-started.md`](docs/getting-started.md) |
+| Installation | [`docs/installation.md`](docs/installation.md) |
+| Annotations | [`docs/annotations.md`](docs/annotations.md) |
+| Build & Run | [`docs/build.md`](docs/build.md) |
+| Scan Cache | [`docs/cache.md`](docs/cache.md) |
+| Package Ignoring | [`docs/ignore.md`](docs/ignore.md) |
+| Common Errors | [`docs/common-errors.md`](docs/common-errors.md) |
 
-MIT. Xem `LICENSE`.
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
